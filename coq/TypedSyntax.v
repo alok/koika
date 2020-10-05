@@ -3,6 +3,9 @@ Require Export Koika.Common Koika.Environments Koika.Types Koika.Primitives.
 
 Import PrimTyped PrimSignatures.
 
+Class VarRef {var_t} (sig: tsig var_t) (k: var_t) (tau: type) :=
+  vr_m : member (k, tau) sig.
+
 Section Syntax.
   Context {pos_t var_t rule_name_t fn_name_t reg_t ext_fn_t: Type}.
   Context {R: reg_t -> type}.
@@ -11,11 +14,11 @@ Section Syntax.
   Inductive action : tsig var_t -> type -> Type :=
   | Fail {sig} tau : action sig tau
   | Var {sig} {k: var_t} {tau: type}
-        (m: member (k, tau) sig) : action sig tau
+        (vr: VarRef sig k tau) : action sig tau
   | Const {sig} {tau: type}
           (cst: type_denote tau) : action sig tau
   | Assign {sig} {k: var_t} {tau: type}
-           (m: member (k, tau) sig) (ex: action sig tau) : action sig unit_t
+           (vr: VarRef sig k tau) (ex: action sig tau) : action sig unit_t
   | Seq {sig tau}
         (r1: action sig unit_t)
         (r2: action sig tau) : action sig tau
@@ -55,6 +58,13 @@ Section Syntax.
 
   Definition rule := action nil unit_t.
 End Syntax.
+
+(* Specify that TC resolution shouldn't guess sig or k, but may guess tau. *)
+Hint Mode VarRef + ! ! - : typeclass_instances.
+
+(* Teach Coq how to find a variable in context *)
+Hint Extern 1 (VarRef ?sig ?k _) =>
+  exact (projT2 (must (assoc k sig))) : typeclass_instances.
 
 Arguments action pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma sig tau : assert.
 Arguments rule pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma : assert.

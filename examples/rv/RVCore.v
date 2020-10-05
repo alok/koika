@@ -605,7 +605,7 @@ Module RV32Core (RVP: RVParams) (Multiplier: MultiplierInterface).
     }}.
 
   (* Useful for debugging *)
-  Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t R Sigma sig} k {tau m} : assert.
+  Arguments Var {pos_t var_t fn_name_t reg_t ext_fn_t R Sigma sig} k {tau vr} : assert.
 
   Definition isMemoryInst : UInternalFunction reg_t empty_ext_fn_t :=
     {{
