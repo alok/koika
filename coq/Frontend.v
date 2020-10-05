@@ -12,6 +12,7 @@ Require Export
         Koika.Interop
         Koika.Compiler
         Koika.Parsing
+        Koika.TypedParsing
         Koika.DeriveShow
         Koika.BitTactics
         Koika.ProgramTactics

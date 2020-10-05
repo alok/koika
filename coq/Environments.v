@@ -317,7 +317,6 @@ Section Maps.
   Qed.
 End Maps.
 
-
 Section ValueMaps.
   Context {K: Type}.
   Context {V: K -> Type} {V': K -> Type}.
@@ -361,6 +360,48 @@ Section ValueMaps.
   Qed.
 End ValueMaps.
 
+Section IndexedValueMaps.
+  Context {K: Type}.
+  Context {V: K -> Type} {V': K -> Type}.
+
+  Fixpoint cmapvi {sig} (fV: forall k, member k sig -> V k -> V' k)
+           (ctx: context V sig) {struct ctx} : context V' sig :=
+    match ctx in context _ sig
+          return (forall k, member k sig -> V k -> V' k) -> context V' sig with
+    | CtxEmpty => fun _ => CtxEmpty
+    | CtxCons k v ctx =>
+      fun fV => CtxCons k (fV k (MemberHd k _) v)
+                     (cmapvi (fun k' m v => fV k' (MemberTl k' k _ m) v)
+                             ctx)
+    end fV.
+
+  Lemma cmapvi_creplace :
+    forall {sig} (fV: forall k, member k sig -> V k -> V' k)
+      (ctx: context V sig) {k} (m: member k sig) v,
+      cmapvi fV (creplace m v ctx) =
+      creplace m (fV k m v) (cmapvi fV ctx).
+  Proof.
+    induction ctx; cbn; intros.
+    - destruct (mdestruct m).
+    - destruct (mdestruct m) as [(-> & ->) | (? & ->)]; cbn in *.
+      + reflexivity.
+      + rewrite IHctx; reflexivity.
+  Qed.
+
+  Lemma cmapvi_cassoc :
+    forall {sig} (fV: forall k, member k sig -> V k -> V' k)
+      (ctx: context V sig) {k} (m: member k sig),
+      cassoc m (cmapvi fV ctx) =
+      fV k m (cassoc m ctx).
+  Proof.
+    induction ctx; cbn; intros.
+    - destruct (mdestruct m).
+    - destruct (mdestruct m) as [(-> & ->) | (? & ->)]; cbn in *.
+      + reflexivity.
+      + rewrite IHctx; reflexivity.
+  Qed.
+End IndexedValueMaps.
+
 Section Folds.
   Context {K: Type}.
   Context {V: K -> Type}.
@@ -378,9 +419,36 @@ Section Folds.
     Fixpoint cfoldl' {sig} (ctx: context V sig) (init: T) :=
       match sig return context V sig -> T with
       | [] => fun _ => init
-      | k :: sig => fun ctx => cfoldl (ctl ctx) (f k (chd ctx) init)
+      | k :: sig => fun ctx => cfoldl' (ctl ctx) (f k (chd ctx) init)
       end ctx.
   End foldl.
+
+  Section foldli.
+    Context {T: Type}.
+
+    Fixpoint cfoldli {sig}
+             (f: forall (k: K) (m: member k sig) (v: V k) (acc: T), T)
+             (ctx: context V sig) (init: T) :=
+      match ctx in context _ sig
+            return (forall (k: K) (m: member k sig) (v: V k) (acc: T), T) -> T with
+      | CtxEmpty => fun _ => init
+      | CtxCons k v ctx =>
+        fun f => cfoldli (fun k' m v acc => f k' (MemberTl k' k _ m) v acc)
+                      ctx (f k (MemberHd k _) v init)
+      end f.
+
+    Fixpoint cfoldli' {sig}
+             (f: forall (k: K) (m: member k sig) (v: V k) (acc: T), T)
+             (ctx: context V sig) (init: T) :=
+      match sig
+            return (forall (k: K) (m: member k sig) (v: V k) (acc: T), T) ->
+                   context V sig -> T with
+      | [] => fun _ _ => init
+      | k :: sig =>
+        fun f ctx => cfoldli' (fun k' m v acc => f k' (MemberTl k' k _ m) v acc)
+                           (ctl ctx) (f k (MemberHd k _) (chd ctx) init)
+      end f ctx.
+  End foldli.
 
   Section foldr.
     Context {T: list K -> Type}.

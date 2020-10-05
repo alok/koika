@@ -155,10 +155,13 @@ End PrimTyped.
 Module PrimTypeInference.
   Import PrimUntyped PrimTyped.
 
+  Definition find_field_opt (sig: struct_sig) (f: string) : option _ :=
+    let/opt e := assoc f sig.(struct_fields) in
+    Some (existT (fun ktau => member ktau (struct_fields sig))
+                 (f, projT1 e) (projT2 e)).
+
   Definition find_field sig f : result _ fn_tc_error :=
-    opt_result (let/opt e := assoc f sig.(struct_fields) in
-                Some (existT (fun ktau => member ktau (struct_fields sig))
-                             (f, projT1 e) (projT2 e)))
+    opt_result (find_field_opt sig f)
                (Arg1, UnboundField f sig).
 
   Definition check_index sig pos : result (array_index sig) fn_tc_error :=
