@@ -151,7 +151,10 @@ Section TypeInference.
         let/res fn_body' := type_action (actpos pos fn.(uint_body)) (List.rev fn.(uint_argspec)) fn.(uint_body) in
         let/res fn_body' := cast_action (actpos pos fn.(uint_body)) fn.(uint_retType) (``fn_body') in
 
-        Success (EX (TypedSyntax.InternalCall fn.(uint_name) args_ctx fn_body'))
+        Success (EX (TypedSyntax.InternalCall
+                       {| int_name := fn.(uint_name);
+                          int_body := fn_body' |}
+                          args_ctx ))
       | UUnop fn arg1 =>
         let pos1 := actpos pos arg1 in
         let/res arg1' := type_action pos sig arg1 in

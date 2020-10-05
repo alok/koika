@@ -1069,12 +1069,12 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
         let bindings, body = loop pos [] action in
         List.rev bindings, body in
 
-      let package_intfun fn argspec tau body =
+      let package_intfun fn argspec tau =
         (* Put function in untyped package to hash on all fields *)
-        { Extr.uint_name = hpp.cpp_fn_names fn;
+        { Extr.uint_name = hpp.cpp_fn_names fn.Extr.int_name;
           Extr.uint_argspec = argspec;
           Extr.uint_retType = tau;
-          Extr.uint_body = body } in
+          Extr.uint_body = fn.Extr.int_body } in
 
       (* Table mapping function objects to unique names.  This is reset for each
          rules, because each implementation of a function is specific to one
@@ -1082,8 +1082,8 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
          to invoke a rule-specific reset function *)
       let internal_functions = Hashtbl.create 20 in
 
-      let lookup_intfun fn argspec tau body =
-        let intf = package_intfun fn argspec tau body in
+      let lookup_intfun fn argspec tau =
+        let intf = package_intfun fn argspec tau in
         intf, Hashtbl.find_opt internal_functions intf in
 
       let rec p_action
@@ -1185,8 +1185,8 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
            (* See ‘Read’ case for why returning just ImpureExpr isn't safe *)
            let expr = cpp_ext_funcall ffi.ffi_name kind (must_value a) in
            p_assign_impure target (ImpureExpr expr)
-        | Extr.InternalCall (_, tau, fn, argspec, rev_args, body) ->
-           let fn_name = match snd (lookup_intfun fn argspec tau body) with
+        | Extr.InternalCall (_, tau, argspec, fn, rev_args) ->
+           let fn_name = match snd (lookup_intfun fn argspec tau) with
              | Some fn -> fn
              | None -> assert false in
            let args = Extr.cfoldl (fun (argname, tau) arg argstrs ->
@@ -1270,13 +1270,13 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
             else
               loop (counter + 1) in
           loop 0 in
-        let register_intfun pos fn argspec tau body =
+        let register_intfun pos fn argspec tau =
           assert_no_duplicates ~descr:"argument list"
             (List.map (fun (v, _) -> hpp.cpp_var_names v) argspec);
-          match lookup_intfun fn argspec tau body with
+          match lookup_intfun fn argspec tau with
           | _, Some _ -> ()
           | intf, None ->
-             let nm = ensure_fresh (hpp.cpp_fn_names fn) in
+             let nm = ensure_fresh (hpp.cpp_fn_names fn.Extr.int_name) in
              fns := (pos, nm, intf) :: !fns;
              Hashtbl.add internal_functions intf nm in
         let rec loop pos = function
@@ -1299,10 +1299,10 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
              loop pos c;
              loop pos tbr;
              loop pos fbr
-          | Extr.InternalCall (_, tau, fn, argspec, rev_args, body) ->
-             register_intfun pos fn argspec tau body;
+          | Extr.InternalCall (_, tau, argspec, fn, rev_args) ->
+             register_intfun pos fn argspec tau;
              Extr.cfoldr (fun _ _ arg () -> loop pos arg) argspec rev_args ();
-             loop pos body in
+             loop pos fn.Extr.int_body in
         loop pos action;
         List.rev !fns in
 
