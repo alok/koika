@@ -59,3 +59,6 @@ End Syntax.
 
 Arguments action pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma sig tau : assert.
 Arguments rule pos_t var_t fn_name_t {reg_t ext_fn_t} R Sigma : assert.
+
+Notation InternalFunction pos_t var_t fn_name_t R Sigma sig tau :=
+  (InternalFunction' fn_name_t (action pos_t var_t fn_name_t R Sigma sig tau)).

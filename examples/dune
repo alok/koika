@@ -59,6 +59,18 @@ Extraction \"datatypes.ml\" datatypes.prog."))
 
 
 ;; -*- dune -*-
+(subdir "_objects/experiments.v"
+ (rule (write-file "experiments_extr.v"
+                   "Require Coq.extraction.Extraction examples.experiments.
+Extraction \"experiments.ml\" experiments.prog."))
+ (coq.extraction
+  (prelude experiments_extr)
+  (extracted_modules experiments)
+  (theories Koika examples)
+  (flags "-w" "-overriding-logical-loadpath")))
+
+
+;; -*- dune -*-
 (subdir "_objects/external_rule.v"
  (rule (write-file "external_rule_extr.v"
                    "Require Coq.extraction.Extraction examples.external_rule.
