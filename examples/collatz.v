@@ -18,38 +18,36 @@ Module Collatz.
     | r0 => Bits.of_nat sz 18
     end.
 
-  Definition times_three : UInternalFunction reg_t empty_ext_fn_t :=
-    {{ fun times_three (bs: bits_t 16) : bits_t 16 =>
-         (bs << Ob~1) + bs }}.
+  Definition times_three : InternalFunction R empty_Sigma _ _ :=
+    <{ fun times_three (bs: bits_t 16) : bits_t 16 =>
+         (bs << Ob~1) + bs }>.
 
-  Definition _divide : uaction reg_t empty_ext_fn_t :=
-    {{ let v := read0(r0) in
+  Program Definition _divide : rule R empty_Sigma :=
+    <{ let v := read0(r0) in
        let odd := v[Ob~0~0~0~0] in
        if !odd then
          write0(r0,v >> Ob~1)
        else
-         fail }}.
+         fail }>.
 
-  Definition _multiply : uaction reg_t empty_ext_fn_t :=
-    {{ let v := read1(r0) in
+  Program Definition _multiply : rule R empty_Sigma :=
+    <{ let v := read1(r0) in
        let odd := v[Ob~0~0~0~0] in
        if odd then
-         write1(r0, times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
+         write1(r0, funcall times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
        else
-         fail }}.
+         fail }>.
 
   Definition collatz : scheduler :=
     divide |> multiply |> done.
 
   Definition cr := ContextEnv.(create) r.
 
-  (* Typechecking  *)
   Definition rules :=
-    tc_rules R empty_Sigma
-             (fun r => match r with
-                    | divide => _divide
-                    | multiply => _multiply
-                    end).
+    fun r => match r with
+          | divide => _divide
+          | multiply => _multiply
+          end.
 
   Definition cycle_log :=
     tc_compute (interp_scheduler cr empty_sigma rules collatz).
@@ -72,7 +70,7 @@ Module Collatz.
   Definition circuits_result :=
     tc_compute (interp_circuits empty_sigma circuits (lower_r (ContextEnv.(create) r))).
 
-  Example test: circuits_result = Environments.map _ (fun _ => bits_of_value) result :=
+  Example test: circuits_result = Lowering.lower_r result :=
     eq_refl.
 
   Definition package :=

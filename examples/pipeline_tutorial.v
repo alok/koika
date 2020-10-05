@@ -56,8 +56,8 @@ Definition Sigma (fn: ext_fn_t) : ExternalSignature :=
 Then we declare the rules of the system.  Notice how ``doG`` writes at port 0 and ``doF`` reads at port 1.  This is because we're building a pipelined queue, not a bypassing one, so we expect clients to pull first and push second.  Notice also that each rule is "guarded" by a call to ``fail``; that is, if ``doF`` can't push into the queue because ``doG`` is lagging then ``doF`` won't run at all, and if there's no data ready for ``doG`` to consume because ``doF`` isn't keeping up then ``doG`` won't run.
 |*)
 
-Definition _doF : uaction _ _ :=
-  {{
+Program Definition _doF : rule R Sigma :=
+  <{
      let v := read0(input_buffer) in
      write0(input_buffer, extcall NextInput(v));
      let queue_empty := read1(queue_empty) in
@@ -66,10 +66,10 @@ Definition _doF : uaction _ _ :=
        write0(queue_data, extcall F(v))
      else
        fail
-  }}.
+  }>.
 
-Definition _doG : uaction _ _ :=
-  {{
+Program Definition _doG : rule R Sigma :=
+  <{
       let queue_empty := read0(queue_empty) in
       if !queue_empty then
         let data := read0(queue_data) in
@@ -77,23 +77,17 @@ Definition _doG : uaction _ _ :=
         write0(queue_empty, Ob~1)
       else
         fail
-  }}.
-
-(*|
-Rules are written in an untyped language, so we need to typecheck them, which is done using ``tc_rules``:
-|*)
+  }>.
 
 Inductive rule_name_t :=
 | doF
 | doG.
 
-Definition rules : rule_name_t -> rule R Sigma :=
-  Eval vm_compute in
-    tc_rules R Sigma
-             (fun rl => match rl with
-                     | doF => _doF
-                     | doG => _doG
-                     end).
+Definition rules (rl: rule_name_t) : rule R Sigma :=
+  match rl with
+  | doF => _doF
+  | doG => _doG
+  end.
 
 (*|
 The last step if to define the system's scheduler.  Note that we perform ``doG`` before ``doF`` (intuitively, pipelines run back-to-front: in a sequential model, G removes the data found in the queue and writes it to the output, then F reads the input and writes it in the queue).
