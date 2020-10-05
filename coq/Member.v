@@ -86,6 +86,16 @@ Proof.
   intros ** Heq%member_idx_inj_k; congruence.
 Qed.
 
+Lemma member_idx_skipn_cons_next {K}:
+  forall (k: K) (ls: list K) (m: member k ls),
+    k :: skipn (S (member_idx m)) ls =
+    skipn (member_idx m) ls.
+Proof.
+  induction m; cbn; intros.
+  - reflexivity.
+  - rewrite <- IHm; reflexivity.
+Qed.
+
 Fixpoint member_map {K K'} (f: K -> K') {k: K} {ls: list K}
          (m: member k ls) : member (f k) (List.map f ls) :=
   match m in (member k ls) return (member (f k) (List.map f ls)) with

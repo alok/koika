@@ -1,6 +1,6 @@
 (*! Language | Types used by Kôika programs !*)
 Require Export Coq.Strings.String.
-Require Export Koika.Common Koika.IndexUtils.
+Require Export Koika.Common Koika.Member.
 
 (** * Definitions **)
 
@@ -58,25 +58,39 @@ Fixpoint type_sz tau :=
 
 Notation struct_fields_sz := (struct_fields_sz' type_sz).
 
-Definition struct_index (sig: struct_sig) :=
-  Vect.index (List.length sig.(struct_fields)).
+Definition struct_index' (fields: list (string * type)) :=
+  { k_tau & member k_tau fields }.
+
+Notation struct_index sig := (struct_index' sig.(struct_fields)).
 
 Definition struct_sz sig :=
   type_sz (struct_t sig).
 
-Definition field_type (sig: struct_sig) idx :=
-  snd (List_nth sig.(struct_fields) idx).
+Definition field_type' (k_tau: string * type) :=
+  snd k_tau.
 
-Definition field_sz (sig: struct_sig) idx :=
-  type_sz (field_type sig idx).
+Notation field_type idx :=
+  (field_type' (projT1 idx)).
 
-Definition field_offset_left (sig: struct_sig) (idx: struct_index sig) :=
-  let prev_fields := List.firstn (index_to_nat idx) sig.(struct_fields) in
+Definition field_sz' (k_tau: string * type) :=
+  type_sz (field_type' k_tau).
+
+Notation field_sz idx :=
+  (field_sz' (projT1 idx)).
+
+Definition field_offset_left' {fields k_tau} (m: member k_tau fields) :=
+  let prev_fields := List.firstn (member_idx m) fields in
   struct_fields_sz prev_fields.
 
-Definition field_offset_right (sig: struct_sig) (idx: struct_index sig) :=
-  let next_fields := List.skipn (S (index_to_nat idx)) sig.(struct_fields) in
+Notation field_offset_left idx :=
+  (field_offset_left' (projT2 idx)).
+
+Definition field_offset_right' {fields k_tau} (m: member k_tau fields) :=
+  let next_fields := List.skipn (S (member_idx m)) fields in
   struct_fields_sz next_fields.
+
+Notation field_offset_right idx :=
+  (field_offset_right' (projT2 idx)).
 
 Definition array_index (sig: array_sig) :=
   Vect.index sig.(array_len).
@@ -116,22 +130,28 @@ Notation struct_denote := (struct_denote' type_denote).
 
 (** * Bit representations **)
 
-Fixpoint bits_of_value {tau: type} (x: type_denote tau) {struct tau} : bits (type_sz tau) :=
-  let bits_of_struct_value :=
-      (fix bits_of_struct_value
+Section StructPacking.
+  Context (bits_of_value: forall {tau: type} (x: type_denote tau), bits (type_sz tau)).
+
+  Fixpoint bits_of_struct_value'
            {fields}
            (x: struct_denote fields)
-       : bits (struct_fields_sz fields) :=
-         match fields return struct_denote fields -> bits (struct_fields_sz fields) with
-         | [] => fun _ => vect_nil
-         | (nm, tau) :: fields => fun '(x, xs) => Bits.app (bits_of_value x) (bits_of_struct_value xs)
-         end x) in
+    : bits (struct_fields_sz fields) :=
+    match fields return struct_denote fields -> bits (struct_fields_sz fields) with
+    | [] => fun _ => vect_nil
+    | (nm, tau) :: fields => fun '(x, xs) => Bits.app (bits_of_value _ x) (bits_of_struct_value' xs)
+    end x.
+End StructPacking.
+
+Fixpoint bits_of_value {tau: type} (x: type_denote tau) {struct tau} : bits (type_sz tau) :=
   match tau return type_denote tau -> bits (type_sz tau) with
   | bits_t _ => fun bs => bs
   | enum_t _ => fun bs => bs
-  | struct_t _ => fun str => bits_of_struct_value str
+  | struct_t _ => fun str => bits_of_struct_value' (@bits_of_value) str
   | array_t _ => fun v => Bits.appn (vect_map bits_of_value v)
   end x.
+
+Notation bits_of_struct_value := (@bits_of_struct_value' (@bits_of_value)).
 
 Fixpoint value_of_bits {tau: type} (bs: bits (type_sz tau)) {struct tau}: type_denote tau :=
   let value_of_struct_bits :=

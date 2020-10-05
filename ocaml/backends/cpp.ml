@@ -1017,9 +1017,8 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
                      | Ignore -> sprintf "prims::ignore(%s)" a1)
         | Bits1 fn ->
            PureExpr (sprintf "%s(%s)" (cpp_bits1_fn_name fn) a1)
-        | Struct1 (sg, idx) ->
+        | Struct1 (_, (Cuttlebone.Extr.ExistT ((fname, _tau), _m))) ->
            (* Extraction eliminated the single-constructor struct1 inductive (GetField) *)
-           let fname, _tau = Cuttlebone.Util.list_nth sg.struct_fields idx in
            let fname = cpp_field_name (Cuttlebone.Util.string_of_coq_string fname) in
            PureExpr (sprintf "%s.%s" a1 fname)
         | Array1 (sg, idx) ->
@@ -1033,10 +1032,10 @@ let compile (type pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t)
            PureExpr (sp_equality ~negated a1 a2)
         | Bits2 fn ->
            PureExpr (sp_binop (cpp_bits2_fn_name fn) a1 a2)
-        | Struct2 (sg, idx) ->
+        | Struct2 (sg, (Cuttlebone.Extr.ExistT ((fname, _tau), _m))) ->
            (* Extraction eliminated the single-constructor struct2 inductive (SusbtField) *)
+           let fname = Cuttlebone.Util.string_of_coq_string fname in
            let sg = Cuttlebone.Util.struct_sig_of_extr_struct_sig sg in
-           let fname, _tau = Cuttlebone.Util.list_nth sg.struct_fields idx in
            let tinfo = ensure_target (Struct_t sg) target in
            let res = p_assign_expr (VarTarget tinfo) (PureExpr a1) in
            p "%s.%s = %s;" tinfo.name (cpp_field_name fname) a2;

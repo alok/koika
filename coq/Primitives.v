@@ -146,17 +146,20 @@ Module PrimTyped.
     SliceSubst (array_sz sig) (element_offset_right sig idx) (element_sz sig).
 
   Definition GetFieldBits (sig: struct_sig) (idx: struct_index sig) : fbits1 :=
-    Slice (struct_sz sig) (field_offset_right sig idx) (field_sz sig idx).
+    Slice (struct_sz sig) (field_offset_right idx) (field_sz idx).
 
   Definition SubstFieldBits (sig: struct_sig) (idx: struct_index sig) : fbits2 :=
-    SliceSubst (struct_sz sig) (field_offset_right sig idx) (field_sz sig idx).
+    SliceSubst (struct_sz sig) (field_offset_right idx) (field_sz idx).
 End PrimTyped.
 
 Module PrimTypeInference.
   Import PrimUntyped PrimTyped.
 
   Definition find_field sig f : result _ fn_tc_error :=
-    opt_result (List_assoc f sig.(struct_fields)) (Arg1, UnboundField f sig).
+    opt_result (let/opt e := assoc f sig.(struct_fields) in
+                Some (existT (fun ktau => member ktau (struct_fields sig))
+                             (f, projT1 e) (projT2 e)))
+               (Arg1, UnboundField f sig).
 
   Definition check_index sig pos : result (array_index sig) fn_tc_error :=
     opt_result (Vect.index_of_nat sig.(array_len) pos) (Arg1, OutOfBounds pos sig).
@@ -313,7 +316,7 @@ Module PrimSignatures.
       end
     | Display fn => DisplaySigma fn
     | Bits1 fn => Sig_of_CSig (CSigma1 fn)
-    | Struct1 GetField sig idx => {$ struct_t sig ~> field_type sig idx $}
+    | Struct1 GetField sig idx => {$ struct_t sig ~> field_type idx $}
     | Array1 GetElement sig idx => {$ array_t sig ~> sig.(array_type) $}
     end.
 
@@ -321,7 +324,7 @@ Module PrimSignatures.
     match fn with
     | Eq tau _ => {$ tau ~> tau ~> bits_t 1 $}
     | Bits2 fn => Sig_of_CSig (CSigma2 fn)
-    | Struct2 SubstField sig idx => {$ struct_t sig ~> field_type sig idx ~> struct_t sig $}
+    | Struct2 SubstField sig idx => {$ struct_t sig ~> field_type idx ~> struct_t sig $}
     | Array2 SubstElement sig idx => {$ array_t sig ~> sig.(array_type) ~> array_t sig $}
     end.
 End PrimSignatures.
@@ -351,26 +354,32 @@ Module BitFuns.
   Definition _neq {tau} {EQ: EqDec tau} (v1 v2: tau) :=
     Ob~(negb (beq_dec v1 v2)).
 
-  Fixpoint get_field fields
+  Fixpoint get_field' {fields}
            (v: struct_denote fields)
-           (idx: index (List.length fields))
-           {struct fields}
-    : type_denote (snd (List_nth fields idx)).
-    destruct fields, idx, p; cbn.
-    - apply (fst v).
-    - apply (get_field fields (snd v) a).
-  Defined.
+           {k_tau} (m: member k_tau fields)
+           {struct m}
+    : type_denote (snd k_tau) :=
+    match m in (member k_tau fields) return (struct_denote fields -> snd k_tau) with
+    | MemberHd k_tau fields => fun v => fst v
+    | MemberTl k_tau _ fields m => fun v => get_field' (snd v) m
+    end v.
 
-  Fixpoint subst_field fields
+  Fixpoint subst_field' {fields}
            (v: struct_denote fields)
-           (idx: index (List.length fields))
-           (v': type_denote (snd (List_nth fields idx)))
-           {struct fields}
-    : (struct_denote fields).
-    destruct fields, idx, p; cbn.
-    - apply (v', snd v).
-    - apply (fst v, subst_field fields (snd v) a v').
-  Defined.
+           {k_tau} (m: member k_tau fields)
+           (v': type_denote (snd k_tau))
+    : (struct_denote fields) :=
+    match m in (member k_tau fields)
+          return (struct_denote fields -> snd k_tau -> struct_denote fields) with
+    | MemberHd k_tau fields => fun v v' => (v', snd v)
+    | MemberTl k_tau _ fields m => fun v v' => (fst v, subst_field' (snd v) m v')
+    end v v'.
+
+  Notation get_field v idx :=
+    (get_field' v (projT2 idx)).
+
+  Notation subst_field v idx v' :=
+    (subst_field' v (projT2 idx) v').
 End BitFuns.
 
 Module CircuitPrimSpecs.
@@ -433,7 +442,7 @@ Module PrimSpecs.
       | Ignore => fun _ => Ob
       end
     | Bits1 fn => CircuitPrimSpecs.sigma1 fn
-    | Struct1 GetField sig idx => fun s => get_field sig.(struct_fields) s idx
+    | Struct1 GetField sig idx => fun s => get_field s idx
     | Array1 GetElement sig idx => fun a => vect_nth a idx
     end.
 
@@ -442,7 +451,7 @@ Module PrimSpecs.
     | Eq tau false  => _eq
     | Eq tau true  => _neq
     | Bits2 fn => CircuitPrimSpecs.sigma2 fn
-    | Struct2 SubstField sig idx => fun s v => subst_field sig.(struct_fields) s idx v
+    | Struct2 SubstField sig idx => fun s v => subst_field s idx v
     | Array2 SubstElement sig idx => fun a e => vect_replace a idx e
     end.
 End PrimSpecs.

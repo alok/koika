@@ -40,14 +40,14 @@ Proof.
 Qed.
 
 Lemma struct_slice_correct_le :
-  forall fields idx,
-    struct_fields_sz (skipn (S (index_to_nat idx)) fields) + type_sz (snd (List_nth fields idx)) <=
+  forall fields k_tau (m: member k_tau fields),
+    struct_fields_sz (skipn (S (member_idx m)) fields) + field_sz' k_tau <=
     struct_fields_sz fields.
 Proof.
   intros.
-  change (type_sz (snd (List_nth fields idx))) with (struct_fields_sz [List_nth fields idx]).
+  change (field_sz' k_tau) with (struct_fields_sz [k_tau]).
   rewrite plus_comm; setoid_rewrite <- list_sum_app; rewrite <- map_app; cbn [List.app].
-  rewrite List_nth_skipn_cons_next.
+  rewrite member_idx_skipn_cons_next.
   rewrite <- skipn_map.
   apply list_sum_skipn_le.
 Qed.
@@ -127,21 +127,27 @@ Lemma _neq_of_value:
     _neq a1 a2.
 Proof. _eq_t. Qed.
 
+Lemma get_field'_bits_slice:
+  forall {fields}
+    {k_tau} (m: member k_tau fields)
+    (v: struct_denote fields),
+    Bits.slice (field_offset_right' m) (field_sz' k_tau) (bits_of_struct_value v) =
+    bits_of_value (get_field' v m).
+Proof.
+  induction m as [(k & tau) fields | k_tau (k' & tau') fields m IHm];
+    destruct v; cbn; intros.
+  - rewrite slice_end, vect_skipn_plus_app.
+    reflexivity.
+  - rewrite <- IHm, slice_front, vect_firstn_plus_app by apply struct_slice_correct_le.
+    reflexivity.
+Qed.
+
 Lemma get_field_bits_slice:
   forall {sig} (idx : struct_index sig) (a : type_denote (struct_t sig)),
-    Bits.slice (field_offset_right sig idx) (field_sz sig idx) (bits_of_value a) =
-    bits_of_value (get_field (struct_fields sig) a idx).
+    Bits.slice (field_offset_right idx) (field_sz idx) (bits_of_value a) =
+    bits_of_value (get_field a idx).
 Proof.
-  intro sig;
-    repeat (simpl; unfold struct_index, field_type, field_sz, field_offset_right).
-  induction (struct_fields sig) as [ | (nm & tau) l ]; simpl.
-  * destruct idx.
-  * destruct idx as [ | idx], a; cbn in *; intros.
-    -- rewrite slice_end, vect_skipn_plus_app.
-       reflexivity.
-    -- rewrite <- IHl.
-       rewrite slice_front, vect_firstn_plus_app by apply struct_slice_correct_le.
-       reflexivity.
+  intros; apply get_field'_bits_slice.
 Qed.
 
 Lemma get_element_bits_slice:
@@ -163,21 +169,28 @@ Proof.
        reflexivity.
 Qed.
 
-Lemma subst_field_bits_slice_subst:
-  forall {sig} (idx : struct_index sig) (a1 : type_denote (struct_t sig)) (a2 : field_type sig idx),
-    Bits.slice_subst (field_offset_right sig idx) (field_sz sig idx) (bits_of_value a1) (bits_of_value a2) =
-    bits_of_value (tau := struct_t _) (subst_field (struct_fields sig) a1 idx a2).
+Lemma subst_field_bits_slice_subst':
+  forall {fields k_tau} (m: member k_tau fields)
+    (v: struct_denote fields)
+    (v': type_denote (snd k_tau)),
+    Bits.slice_subst (field_offset_right' m) (field_sz' k_tau)
+                     (bits_of_struct_value v) (bits_of_value v') =
+    bits_of_struct_value (subst_field' v m v').
 Proof.
-  intro sig;
-    repeat (simpl; unfold struct_index, field_type, field_sz, field_offset_right).
-  induction (struct_fields sig) as [ | (nm & tau) l ]; simpl.
-  * destruct idx.
-  * destruct idx as [ | idx], a1; cbn in *; intros.
-    -- rewrite slice_subst_end, vect_split_app.
-       reflexivity.
-    -- rewrite <- IHl.
-       rewrite slice_subst_front, vect_firstn_plus_app, vect_skipn_plus_app by apply struct_slice_correct_le.
-       reflexivity.
+  induction m as [(k & tau) fields | k_tau (k' & tau') fields m IHm];
+    destruct v; cbn; intros.
+  - rewrite slice_subst_end, vect_split_app.
+    reflexivity.
+  - rewrite <- IHm, slice_subst_front, vect_firstn_plus_app, vect_skipn_plus_app by apply struct_slice_correct_le.
+    reflexivity.
+Qed.
+
+Lemma subst_field_bits_slice_subst:
+  forall {sig} (idx : struct_index sig) (a1 : type_denote (struct_t sig)) (a2 : field_type idx),
+    Bits.slice_subst (field_offset_right idx) (field_sz idx) (bits_of_value a1) (bits_of_value a2) =
+    bits_of_value (tau := struct_t _) (subst_field a1 idx a2).
+Proof.
+  intros; apply subst_field_bits_slice_subst'.
 Qed.
 
 Lemma subst_element_bits_slice_subst:
