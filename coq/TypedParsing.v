@@ -90,7 +90,7 @@ Notation "a" :=
 
 (* Koika_types *)
 Notation " '(' x ':' y ')'" :=
-  (cons (prod_of_argsig {| arg_name := x%string; arg_type := y |}) nil)
+  (cons (x%string, y) nil)
     (in custom tkoika_types at level 60,
         x custom tkoika_var at level 0,
         y constr at level 12).

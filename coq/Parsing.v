@@ -48,8 +48,17 @@ Notation "a" := (ident_to_string a) (in custom koika_var at level 0, a constr at
 Notation "a" := (a) (in custom koika_var at level 0, a constr at level 0, format "'[' a ']'",only printing).
 
 (* Koika_types *)
-Notation " '(' x ':' y ')'" := (cons (prod_of_argsig {| arg_name := x%string; arg_type := y |}) nil) (in custom koika_types at level 60, x custom koika_var at level 0, y constr at level 12 ).
-Notation "a  b" := (app a b)  (in custom koika_types at level 95, a custom koika_types , b custom koika_types, right associativity).
+Notation " '(' x ':' y ')'" :=
+  (cons (x%string, y) nil)
+    (in custom koika_types at level 60,
+        x custom koika_var at level 0,
+        y constr at level 12).
+Notation "a  b" :=
+  (app a b)
+    (in custom koika_types at level 95,
+        a custom koika_types,
+        b custom koika_types,
+        right associativity).
 
 (* Koika_branches *)
 Notation "x '=>' a " := (cons (x,a) nil) (in custom koika_branches at level 60, x custom koika at level 99, a custom koika at level 89).

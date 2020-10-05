@@ -334,14 +334,6 @@ Arguments InternalFunction' : clear implicits.
 Arguments Build_InternalFunction' {fn_name_t action}
           int_name int_body : assert.
 
-Record arg_sig {var_t} :=
-  { arg_name: var_t;
-    arg_type: type }.
-Arguments arg_sig : clear implicits.
-
-Definition prod_of_argsig {var_t} (a: @arg_sig var_t) :=
-  (a.(arg_name), a.(arg_type)).
-
 (** * Debugging and disambiguation of type names **)
 
 Fixpoint type_id (tau: type) : string :=
