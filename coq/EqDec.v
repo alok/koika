@@ -75,3 +75,14 @@ Proof.
   unfold beq_dec.
   rewrite eq_dec_refl; reflexivity.
 Qed.
+
+Lemma beq_dec_inj {A A'} {EQ: EqDec A} {EQ': EqDec A'} (f: A -> A'):
+  (forall a a', f a = f a' -> a = a') ->
+  forall a1 a2, beq_dec (f a1) (f a2) =
+           beq_dec a1 a2.
+Proof.
+  unfold beq_dec; intros.
+  destruct (eq_dec a1 a2) as [-> | Hneq].
+  - rewrite eq_dec_refl; reflexivity.
+  - destruct eq_dec; intuition (exfalso; auto).
+Qed.

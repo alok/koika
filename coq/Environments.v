@@ -507,6 +507,16 @@ Proof.
   apply create_funext; assumption.
 Qed.
 
+Lemma put_get_eq {K} (E: Env K) {V: esig K} (ev: E.(env_t) V) :
+  forall k v,
+    E.(getenv) ev k = v ->
+    E.(putenv) ev k v = ev.
+Proof.
+  intros; apply equiv_eq; intros k'.
+  destruct (eq_dec (EqDec := EqDec_FiniteType (FT := finite_keys E)) k k');
+    subst; eauto using E.(get_put_eq), E.(get_put_neq).
+Qed.
+
 Definition update {K} (E: Env K) {V: esig K}
            (ev: E.(env_t) V) (k: K) (fn: V k -> V k) : E.(env_t) V :=
   E.(putenv) ev k (fn (E.(getenv) ev k)).
@@ -527,6 +537,23 @@ Lemma getenv_zip {K} (E: Env K) {V1 V2: esig K} (ev1: E.(env_t) V1) (ev2: E.(env
   E.(getenv) (zip E ev1 ev2) k = (E.(getenv) ev1 k, E.(getenv) ev2 k).
 Proof.
   unfold zip; rewrite getenv_create; reflexivity.
+Qed.
+
+Lemma getenv_rew {K} (E: Env K) {V V': esig K} (ev: E.(env_t) V) (eqn: V = V') :
+  forall k,
+    E.(getenv) (rew [fun V => E.(env_t) V] eqn in ev) k =
+    rew [fun V => V k] eqn in E.(getenv) ev k.
+Proof.
+  destruct eqn; reflexivity.
+Qed.
+
+Lemma getenv_rew' {K K0} (E: Env K) {V: esig K0}
+      (f f': K -> K0) (ev: E.(env_t) (fun x => V (f x))) (eqn: f = f') :
+  forall k,
+    E.(getenv) (rew [fun f => E.(env_t) (fun x => V (f x))] eqn in ev) k =
+    rew [fun f => V (f k)] eqn in E.(getenv) ev k.
+Proof.
+  destruct eqn; reflexivity.
 Qed.
 
 Definition unzip {K} (E: Env K) {V1 V2: esig K} (ev: E.(env_t) (fun k => V1 k * V2 k)%type)

@@ -3,6 +3,8 @@ Require Export Koika.Member Koika.TypedSyntax Koika.TypedSyntax.
 Require Import Koika.Primitives Koika.TypedSemantics.
 Import PrimTyped.
 
+Require Import Magic.
+
 Section TypedSyntaxMacros.
   Context {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t: Type}.
 
@@ -125,8 +127,106 @@ Section TypedSyntaxMacros.
         InternalCall (lift_intfun' lift fn) (cmapv (fun _ => lift) args)
       | APos pos a => APos pos (lift a)
       end.
+
+    Context {REnv: Env reg_t}.
+    Context {REnv': Env reg_t'}.
+
+    Definition unlift_REnv
+               (f: type -> Type)
+               (env: REnv.(env_t) (fun x => f (R x)))
+    : REnv'.(env_t) (fun x => f (R' x)) :=
+      rew <- [fun R' => REnv'.(env_t) (fun r => f (R' r))] lR.(lift_ok).(lift_comm) in
+        REnv'.(create) (fun reg: reg_t' => REnv.(getenv) env (lR.(lift_fn) reg)).
+
+    Definition unlift_sigma
+               (sigma: forall f, Sig_denote (Sigma f))
+      : forall f, Sig_denote (Sigma' f) :=
+      rew <- [fun Sigma' => forall f, Sig_denote (Sigma' f)] lSigma.(lift_ok).(lift_comm) in
+        (fun f => sigma (lSigma.(lift_fn) f)).
+
+    Definition lift_REnv
+               (f: type -> Type)
+               (env: REnv.(env_t) (fun x => f (R x)))
+               (env': REnv'.(env_t) (fun x => f (R' x)))
+      : REnv.(env_t) (fun x => f (R x)) :=
+      Environments.fold_right
+        REnv'
+        (fun k v acc =>
+           (REnv.(putenv))
+             acc (lR.(lift_fn) k)
+             (rew [fun R' => f (R' k)] lR.(lift_ok).(lift_comm) in v))
+        env' env.
+
+    Context (r: REnv.(env_t) R).
+    Context (sigma: forall f, Sig_denote (Sigma f)).
+
+    Lemma lift_unlift_REnv (f: type -> Type):
+      forall l, lift_REnv f l (unlift_REnv f l) = l.
+    Proof.
+      unfold lift_REnv, unlift_REnv, Environments.fold_right.
+      induction finite_elements; cbn.
+      - reflexivity.
+      - intros.
+        rewrite IHl. apply put_get_eq.
+        unfold eq_rect_r.
+        rewrite getenv_rew'.
+        rewrite getenv_create.
+        rewrite rew_compose.
+        apply __magic__.
+    Qed.
+
+    Lemma unlift_lift_REnv (f: type -> Type):
+      forall ev ev0, unlift_REnv f (lift_REnv f ev0 ev) = ev.
+    Proof.
+      unfold lift_REnv, unlift_REnv, Environments.fold_right.
+      intros.
+      apply equiv_eq; intros k.
+      unfold eq_rect_r; rewrite getenv_rew', getenv_create.
+      (* LR k is in the list, so must be hit, and by injectivity it's not replaced *)
+        apply __magic__.
+    Qed.
+
+    Lemma getenv_unlift_REnv (f: type -> Type) :
+      forall ev k,
+        REnv'.(getenv) (unlift_REnv f ev) k =
+        rew <- [fun R' => f (R' k)] lR.(lift_ok).(lift_comm) in
+          REnv.(getenv) ev (lift_fn lR k).
+    Proof.
+      unfold unlift_REnv; intros.
+      unfold eq_rect_r.
+      rewrite getenv_rew'.
+      rewrite getenv_create; reflexivity.
+    Qed.
+
+    Lemma getenv_lift_REnv_lifted (f: type -> Type) :
+      forall ev ev0 k',
+        REnv.(getenv) (lift_REnv f ev0 ev) (lift_fn lR k') =
+        rew [fun R' => f (R' k')] lR.(lift_ok).(lift_comm) in
+          REnv'.(getenv) ev k'.
+    Proof.
+      apply __magic__.
+    Qed.
+
+    Lemma getenv_lift_REnv_unlifted (f: type -> Type) :
+      forall ev ev0 k,
+        (forall k', lift_fn lR k' <> k) ->
+        REnv.(getenv) (lift_REnv f ev0 ev) k =
+        REnv.(getenv) ev0 k.
+    Proof.
+      apply __magic__.
+    Qed.
   End Lift.
 End TypedSyntaxMacros.
 
 Notation lift_intfun lR lSigma fn :=
   (lift_intfun' (lift lR lSigma) fn).
+
+Require Import CompactLogs.
+
+Arguments unlift_sigma {ext_fn_t} {Sigma} {ext_fn_t'} {Sigma'} {lSigma} sigma f _: assert.
+
+Notation unlift_Log := (unlift_REnv _ LogEntry).
+Notation unlift_r := (unlift_REnv _ type_denote).
+
+Notation lift_Log := (lift_REnv _ LogEntry).
+Notation lift_r := (lift_REnv _ type_denote).

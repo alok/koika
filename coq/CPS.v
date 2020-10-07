@@ -80,14 +80,18 @@ Section CPS.
         end k.
     End Args.
 
+    Definition block {A} (a: A) := a.
+    (* Opaque block. *)
+
     Fixpoint interp_action_cps
              {sig tau}
              (L: Log)
              (a: action sig tau)
              {A} (k: action_continuation A sig tau)
     : action_interpreter A sig :=
-      let cps {sig tau} a {A} k := @interp_action_cps sig tau L a A k in
-      match a in TypedSyntax.action _ _ _ _ _ ts tau return (action_continuation A ts tau -> action_interpreter A ts)  with
+      let cps {sig tau} a {A} k := (block (@interp_action_cps)) sig tau L a A k in
+      match a in TypedSyntax.action _ _ _ _ _ ts tau return
+            (action_continuation A ts tau -> action_interpreter A ts)  with
       | Fail tau => fun k Gamma l => k None
       | Var m => fun k Gamma l => k (Some (l, cassoc m Gamma, Gamma))
       | Const cst => fun k Gamma l => k (Some (l, cst, Gamma))
@@ -289,6 +293,8 @@ Section CPS.
              {A} (k: _ -> A) :=
     interp_scheduler_cps r sigma rules s (fun L => k (commit_update r L)).
 
+  (* FIXME: Make WP functions notations? *)
+
   Section WP.
     Context (r: REnv.(env_t) R).
     Context (sigma: forall f, Sig_denote (Sigma f)).
@@ -346,7 +352,7 @@ Section CPS.
         interp_action_cps r sigma L a k Gamma l =
         k (interp_action r sigma Gamma L l a).
     Proof.
-      fix IHa 4; destruct a; cbn; intros.
+      fix IHa 4; destruct a; cbn; intros; unfold block in *.
       all: repeat match goal with
                   | _ => progress simpl
                   | [ H: context[_ = _] |- _ ] => rewrite H
@@ -541,3 +547,69 @@ Arguments wp_cycle
           {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t}
           {R Sigma} {REnv} sigma
           rules !s r / post : assert.
+
+Require Import TypedSyntaxMacros.
+
+Section lift.
+  Context {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t: Type}.
+
+  Context {R: reg_t -> type}.
+  Context {Sigma: ext_fn_t -> ExternalSignature}.
+  Context {REnv: Env reg_t}.
+
+  Context {reg_t' ext_fn_t': Type}.
+  Context {R': reg_t' -> type}.
+  Context {Sigma': ext_fn_t' -> ExternalSignature}.
+  Context {REnv': Env reg_t'}.
+
+  Context (lR: Intfun_lift R R').
+  Context (lSigma: Intfun_lift Sigma Sigma').
+
+  Context (r: REnv.(env_t) R).
+  Context (sigma: forall f, Sig_denote (Sigma f)).
+
+  Lemma lift_interp :
+    forall {sig tau}
+      (a: TypedSyntax.action pos_t var_t fn_name_t R' Sigma' sig tau)
+      Gamma (L l: Log R REnv),
+      interp_action r sigma Gamma L l (lift lR lSigma a) =
+      match interp_action
+              (R := R') (Sigma := Sigma')
+              (unlift_r r: REnv'.(env_t) _)
+              (unlift_sigma sigma)
+              Gamma (unlift_Log L) (unlift_Log l) a with
+      | Some (l', v, Gamma) => Some (lift_Log l l', v, Gamma)
+      | None => None
+      end.
+  Proof.
+    induction a; cbn; intros; try reflexivity.
+    - rewrite lift_unlift_REnv; reflexivity.
+    - rewrite lift_unlift_REnv; reflexivity.
+    - rewrite IHa.
+      destruct interp_action as [((?, ?), ?) | ]; reflexivity.
+    - rewrite IHa1.
+      destruct interp_action as [((?, ?), ?) | ]; simpl.
+      rewrite IHa2, unlift_lift_REnv.
+      destruct interp_action as [((?, ?), ?) | ]; simpl.
+      all: try reflexivity.
+  Admitted.
+
+  Lemma lift_interp_cps :
+    forall {sig: tsig var_t}
+      {tau}
+      (L: Log R REnv)
+      (a: action pos_t var_t fn_name_t R' Sigma' sig tau)
+      {A} (k: _ -> A)
+      (Gamma: tcontext sig)
+      (l: Log R REnv),
+      interp_action_cps r sigma L (lift lR lSigma a) A k Gamma l =
+      interp_action_cps
+        (R := R') (Sigma := Sigma')
+        (unlift_r r: REnv'.(env_t) _) (unlift_sigma sigma) (unlift_Log L) a
+        A (fun res => match res with
+                   | Some (l', v, Gamma) => k (Some (lift_Log l l', v, Gamma))
+                   | None => k None
+                   end)
+        Gamma (unlift_Log l).
+  Admitted.
+End lift.
