@@ -70,7 +70,7 @@ Section TypedSyntaxProperties.
                interp_args r sigma Gamma sched_log action_log args = Some (l', v, G) ->
                l = action_log).
 
-    { destruct ufn as [name a]; clear dependent a.
+    { destruct fn as [name a]; clear dependent a.
       clear t t2 Heqo.
       revert dependent Gamma.
       revert dependent sched_log.

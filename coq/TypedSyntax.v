@@ -47,7 +47,7 @@ Section Syntax.
     : action sig (Sigma fn).(retSig)
   | InternalCall {sig tau}
                  {argspec : tsig var_t}
-                 (ufn : InternalFunction' fn_name_t (action (List.rev argspec) tau))
+                 (fn : InternalFunction' fn_name_t (action (List.rev argspec) tau))
                  (args: context (fun k_tau => action sig (snd k_tau)) (List.rev argspec))
     : action sig tau
   | APos {sig tau} (pos: pos_t) (a: action sig tau)
