@@ -455,6 +455,20 @@ Section CPS.
         intros; unfold wp_action; rewrite interp_action_cps_correct; reflexivity.
       Qed.
 
+      Lemma wp_action_abstract :
+        forall {sig: tsig var_t}
+          {tau}
+          (Gamma: tcontext sig)
+          (L: Log)
+          (l: Log)
+          (a: action sig tau)
+          (post: action_postcondition sig tau),
+          (forall res, post res) ->
+          wp_action r sigma L a post Gamma l.
+      Proof.
+        intros; apply wp_action_correct; eauto.
+      Qed.
+
       Lemma wp_rule_correct:
         forall (L: Log)
           (rl: rule)
