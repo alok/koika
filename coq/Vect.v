@@ -111,12 +111,20 @@ Proof.
     + try rewrite IHsz by omega; reflexivity.
 Qed.
 
-Definition index_of_nat_lt (sz n: nat)
+Lemma index_of_nat_lt_exfalso {sz n: nat} :
+  n < sz ->
+  index_of_nat sz n = None ->
+  False.
+Proof.
+  intros * Hlt Heq; apply index_of_nat_none_ge in Heq; omega.
+Qed.
+
+Definition index_of_nat_lt {sz n: nat}
   : n < sz -> index sz.
 Proof.
   destruct (index_of_nat sz n) as [idx | ] eqn:Heq; intros Hlt.
   - exact idx.
-  - exfalso; apply index_of_nat_none_ge in Heq; omega.
+  - exfalso; eauto using index_of_nat_lt_exfalso.
 Defined.
 
 Fixpoint largest_index sz : index (S sz) :=

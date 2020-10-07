@@ -30,7 +30,7 @@ Definition r idx : R idx :=
 
 Definition idx_of_nat (sz: nat) (n: nat) :=
   match lt_dec n sz as n return if n then Vect.index sz else unit with
-  | left pr => index_of_nat_lt _ _ pr
+  | left pr => index_of_nat_lt pr
   | _ => tt
   end.
 
