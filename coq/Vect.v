@@ -127,6 +127,24 @@ Proof.
   - exfalso; eauto using index_of_nat_lt_exfalso.
 Defined.
 
+Lemma index_of_nat_bounded' :
+  forall sz n (pr: n < sz),
+    index_of_nat sz n = Some (index_of_nat_lt pr).
+Proof.
+  unfold index_of_nat_lt, index_to_nat, index_of_nat_lt; intros.
+  generalize (@index_of_nat_lt_exfalso sz n).
+  destruct (index_of_nat _ _).
+  - reflexivity.
+  - intros f; exfalso; apply (f pr eq_refl).
+Qed.
+
+Lemma index_to_nat_of_nat_lt :
+  forall sz n (pr: n < sz),
+    index_to_nat (index_of_nat_lt pr) = n.
+Proof.
+  eauto using index_to_nat_of_nat, index_of_nat_bounded'.
+Qed.
+
 Fixpoint largest_index sz : index (S sz) :=
   match sz with
   | 0 => thisone
@@ -578,6 +596,37 @@ Fixpoint vect_find {T sz} (f: T -> bool) (v: vect T sz) : option T :=
                 else vect_find f (vect_tl v)
   end v.
 
+Lemma vect_find_map {T T' sz} (p: T' -> bool) (f: T -> T') :
+  forall v: vect T sz,
+    vect_find p (vect_map f v) =
+    option_map f (vect_find (fun a => p (f a)) v).
+Proof.
+  unfold option_map; induction sz as [ | sz IH]; cbn; intros.
+  - reflexivity.
+  - destruct (p (f _)); try rewrite IH; reflexivity.
+Qed.
+
+Lemma vect_find_morphism {T sz} (f1 f2: T -> bool):
+  (forall t, f1 t = f2 t) ->
+  forall v: vect T sz,
+    vect_find f1 v = vect_find f2 v.
+Proof.
+  induction sz; cbn; intros Heq v; rewrite ?Heq, ?IHsz; eauto.
+Qed.
+
+Lemma vect_find_inj {T T' sz} {EQ: EqDec T} {EQ': EqDec T'}
+      (f: T -> T') (t0: T):
+  (forall t1 t2, f t1 = f t2 -> t1 = t2) ->
+  forall (v: vect T sz),
+    vect_find (fun t => beq_dec (f t0) (f t)) v =
+    vect_find (fun t => beq_dec t0 t) v.
+Proof.
+  induction sz; cbn; intros Heq v.
+  - reflexivity.
+  - rewrite beq_dec_inj by assumption.
+    destruct beq_dec; rewrite ?IHsz; eauto.
+Qed.
+
 Fixpoint vect_find_index {T sz} (f: T -> bool) (v: vect T sz) : option (index sz) :=
   match sz return vect T sz -> option (index sz) with
   | 0 => fun _ => None
@@ -587,6 +636,22 @@ Fixpoint vect_find_index {T sz} (f: T -> bool) (v: vect T sz) : option (index sz
                      | None => None
                      end
   end v.
+
+Fixpoint vect_mem {T sz} {EQ: EqDec T} (k: T) (v: vect T sz) : bool :=
+  match sz return vect T sz -> bool with
+  | 0 => fun _ => false
+  | S n => fun v => if beq_dec k (vect_hd v) then true
+                else vect_mem k (vect_tl v)
+  end v.
+
+Lemma vect_mem_find {T sz} {EQ: EqDec T} (k: T) (v: vect T sz) :
+  vect_find (fun k' => beq_dec k k') v =
+  if vect_mem k v then Some k else None.
+Proof.
+  induction sz; cbn.
+  - reflexivity.
+  - unfold beq_dec; destruct eq_dec; subst; eauto.
+Qed.
 
 Definition vect_index {T sz} {EQ: EqDec T} (k: T) (v: vect T sz) : option (index sz) :=
   vect_find_index (fun t => beq_dec t k) v.
@@ -621,6 +686,29 @@ Qed.
 
 Definition vect_In {T sz} t (v: vect T sz) : Prop :=
   vect_fold_left (fun acc t' => acc \/ t = t') False v.
+
+Lemma vect_mem_In {T sz} {EQ: EqDec T} (k: T) (v: vect T sz) :
+  Bool.reflect (vect_In k v) (vect_mem k v).
+Proof.
+  apply iff_reflect.
+  induction sz; cbn.
+  - firstorder.
+  - destruct (beq_dec k (vect_hd v)) eqn:Heq;
+      rewrite ?beq_dec_iff, ?beq_dec_false_iff in Heq; subst.
+    + firstorder.
+    + rewrite <- IHsz; firstorder.
+Qed.
+
+Lemma vect_nth_In {T sz} (k: T) (v: vect T sz) :
+  forall idx, vect_nth v idx = k ->
+         vect_In k v.
+Proof.
+  induction sz; cbn; intros idx Heq.
+  - destruct idx.
+  - destruct idx; cbn.
+    + right; subst; eauto.
+    + left; eapply IHsz; eauto.
+Qed.
 
 Lemma vect_map_In {T T' sz} (f: T -> T'):
   forall t (v: vect T sz),
@@ -753,6 +841,16 @@ Section Conversions.
   Lemma vect_to_list_map {T T' sz} (f: T -> T'):
     forall (v: vect T sz),
       vect_to_list (vect_map f v) = List.map f (vect_to_list v).
+  Proof.
+    induction sz; destruct v; cbn.
+    - reflexivity.
+    - setoid_rewrite IHsz; reflexivity.
+  Qed.
+
+  Lemma vect_to_list_find {T sz} (f: T -> bool):
+    forall (v: vect T sz),
+      vect_find f v =
+      List.find f (vect_to_list v).
   Proof.
     induction sz; destruct v; cbn.
     - reflexivity.
@@ -1219,6 +1317,38 @@ Module Bits.
           eauto using nat_lt_pow2_N.
     Qed.
 
+    Lemma of_nat_to_nat :
+      forall sz bs,
+        of_nat sz (to_nat bs) = bs.
+    Proof.
+      unfold to_nat, of_nat;
+        intros; rewrite N2Nat.id, of_N_to_N;
+          eauto.
+    Qed.
+
+    Lemma of_nat_inj :
+      forall sz n1 n2,
+        n1 < pow2 sz ->
+        n2 < pow2 sz ->
+        of_nat sz n1 = of_nat sz n2 -> n1 = n2.
+    Proof.
+      intros sz n1 n2 Hn1 Hn2 Heq.
+      apply (f_equal to_nat) in Heq.
+      rewrite !to_nat_of_nat in Heq by assumption.
+      assumption.
+    Qed.
+
+    Lemma of_index_inj :
+      forall sz n (idx1 idx2: index n),
+        n <= pow2 sz ->
+        of_index sz idx1 = of_index sz idx2 ->
+        idx1 = idx2.
+    Proof.
+      unfold of_index; intros sz n idx1 idx2 Hlt Heq.
+      apply of_nat_inj, index_to_nat_injective in Heq.
+      all: eauto using Nat.lt_le_trans, index_to_nat_bounded.
+    Qed.
+
     Lemma to_nat_bounded {sz} :
       forall (bs: bits sz), to_nat bs < pow2 sz.
     Proof.
@@ -1229,7 +1359,22 @@ Module Bits.
     Qed.
 
     Definition to_index_safe {sz} (bs: bits sz) :=
-      index_of_nat_lt (pow2 sz) (to_nat bs) (to_nat_bounded _).
+      @index_of_nat_lt (pow2 sz) (to_nat bs) (to_nat_bounded _).
+
+    Lemma log2_pow2_id :
+      forall n, Nat.log2_up (pow2 n) = n.
+    Proof.
+      intros; rewrite pow2_correct;
+        auto using Nat.log2_up_pow2, Nat.le_0_l.
+    Qed.
+
+    Lemma of_index_to_index_safe {sz} (bs: bits sz) :
+      of_index _ (to_index_safe bs) = bs.
+    Proof.
+      intros; unfold of_index, to_index_safe.
+      rewrite index_to_nat_of_nat_lt, of_nat_to_nat.
+      reflexivity.
+    Qed.
   End Casts.
 
   Section Arithmetic.
