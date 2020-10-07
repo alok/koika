@@ -1,8 +1,10 @@
 (*! Frontend | Parser for the typed Kôika EDSL !*)
 Require Import
         Koika.Common
-        Koika.TypedSyntax
+        Koika.TypedSyntaxMacros
         Koika.IdentParsing.
+Require Import
+        Koika.Magic.
 
 Export Koika.Types.SigNotations.
 Export Koika.Primitives.PrimTyped.
@@ -19,7 +21,7 @@ Declare Custom Entry tkoika_consts.
 Notation "'<{' e '}>'" :=
   (e)
     (e custom tkoika at level 200,
-     format "'<{' '[v' '/' e '/' ']' '}>'").
+     format "'<{'  '[hv  ' e ']'  '}>'"). (* FIXME parsing.v format *)
 
 (* Koika_consts *)
 Notation "'1'" :=
@@ -39,11 +41,20 @@ Notation "bs '~' '1'" :=
     (in custom tkoika_consts at level 7,
         left associativity,
         format "bs '~' '1'").
+
 Notation "'Ob' '~' number" :=
   (Const (tau := bits_t _) number)
     (in custom tkoika at level 7,
         number custom tkoika_consts at level 99,
         format "'Ob' '~' number").
+
+Notation "'Ob'" :=               (* FIXME copy to Parsing.v? *)
+  (Const (tau := bits_t 0) Ob)
+    (in custom tkoika at level 7,
+        format "'Ob'").
+
+Check <{ Ob~0~0~1 }>.
+Check <{ Ob }>.
 
 Notation "'|' a '`d' b '|'" :=
   (Const (tau := bits_t a) (Bits.of_N a b%N))
@@ -52,135 +63,92 @@ Notation "'|' a '`d' b '|'" :=
         b constr at level 0,
         format "'|' a '`d' b '|'").
 
-(* Koika_args *)
-Declare Custom Entry tkoika_middle_args.
+Check <{ |3`d0| }>.
 
-Notation "x" :=
-  (CtxCons _ x CtxEmpty)
-    (in custom tkoika_middle_args at level 0,
-        x custom tkoika at level 99).
+Notation "'$' n" :=
+  (Const (tau := bits_t _) (Bits.of_N _ n%N))
+    (in custom tkoika at level 0,
+        n constr at level 0,
+        format "'$' n").
 
-Notation "x ',' y" :=
-  (CtxCons _ x y)
-    (in custom tkoika_middle_args at level 1,
-        x custom tkoika_middle_args,
-        y custom tkoika_middle_args,
-        right associativity).
+Check <{ $3 }>.
 
-Notation "'()'" :=
-  CtxEmpty (in custom tkoika_args).
+Notation "'#' s" :=
+  (Const (tau := bits_t _) s)
+    (in custom tkoika at level 98,
+        s constr at level 0,
+        only parsing).
 
-Notation "'(' x ')'" :=
-  x (in custom tkoika_args, x custom tkoika_middle_args).
+Check <{ #(Bits.of_nat _ 3) }>. (* FIXME not reparseable *)
+
+Notation "'(' a ')'" :=
+  (a)
+    (in custom tkoika at level 1,
+        a custom tkoika at level 200,
+        format "'[v' '(' a ')' ']'").
+Check <{ (($3)) }>.
+
 (* Koika_var *)
-
 (* Class NameRef := nr_name: string. *)
 (* Hint Extern 1 NameRef => serialize_ident_in_context : typeclass_instances. *)
-
 (* Notation ident_to_string' a := (match __Ltac2_Mark return NameRef with *)
 (*                                | a => _ *)
 (*                                end) (only parsing). *)
 
+
 Notation "a" :=
   (ident_to_string a)
-    (in custom tkoika_var at level 0, a constr at level 0, format "'[' a ']'", only parsing).
+    (in custom tkoika_var at level 0,
+        a constr at level 0,
+        only parsing).
 Notation "a" :=
   (a)
-    (in custom tkoika_var at level 0, a constr at level 0, format "'[' a ']'", only printing).
+    (in custom tkoika_var at level 0,
+        a constr at level 0,
+        only printing).
 
-(* Koika_types *)
-Notation " '(' x ':' y ')'" :=
-  (cons (x%string, y) nil)
-    (in custom tkoika_types at level 60,
-        x custom tkoika_var at level 0,
-        y constr at level 12).
-Notation "a  b" :=
-  (app a b)
-    (in custom tkoika_types at level 95,
-        a custom tkoika_types,
-        b custom tkoika_types,
-        right associativity).
+(* This typeclass trick doesn't work.  I added it in hopes of making struct_sig
+   inference possible, but it's not enough.  Take a bit of code like get(v,
+   foo), where v is a struct in context.  There are two typeclasses to infer:
 
-(* Koika_branches *)
-Notation "x '=>' a " :=
-  (cons (x, a) nil)
-    (in custom tkoika_branches at level 60,
-        x custom tkoika at level 99,
-        a custom tkoika at level 89).
-Notation "arg1 '|' arg2" :=
-  (app arg1 arg2)
-    (in custom tkoika_branches at level 13,
-        arg1 custom tkoika_branches,
-        arg2 custom tkoika_branches,
-        format "'[v' arg1 ']' '/' '|'  '[v' arg2 ']'").
+   - ?vr: VarRef [("v", struct_t test_sig)] "v" (arg1Sig (Struct1 ?sg ?idx)))
+   - ?idx: StructField ?sg foo
 
-(* Koika *)
+   The problem is that the variable type in the VarRef (spuriously) depends
+   on ?idx, and so TC resolution tries to find the ?idx first, which it can't
+   since ?sg isn't resolved yet.
 
-Notation "'fail'" :=
-  (Fail _)
-    (in custom tkoika, format "'fail'").
-Notation "'fail' '(' t ')'" :=
-  (Fail (bits_t t))
-    (in custom tkoika,
-        t constr at level 0,
-        format "'fail' '(' t ')'").
-Notation "'fail' '@(' t ')'" :=
-  (Fail t)
-    (in custom tkoika,
-        t constr at level 0,
-        format "'fail' '@(' t ')'").
+   Making the type explicit removed the dependency and fixed it, so the hope
+   would be that using an untyped VarRef would help, but it didn't:
 
-Require Import Magic.
+    Definition xx : action R Sigma [("v", struct_t test_sig)] _ :=
+      <{ get(`Var (_: VarRef [("v", struct_t test_sig)] "v" (struct_t test_sig))`, foo) }>. *)
 
-Notation "'pass'" :=
-  (Const (tau := bits_t 0) Ob)
-    (in custom tkoika).
-Notation "'magic'" :=
-  (Const __magic__)
-    (in custom tkoika).
+(* Class UntypedVarRef {var_t} (sig: tsig var_t) (k: var_t) := *)
+(*   { uvr_tau : type; *)
+(*     uvr_m : member (k, uvr_tau) sig }. *)
+(* Definition VarRef_of_UntypedVarRef *)
+(*            {var_t} {sig: tsig var_t} {k: var_t} *)
+(*            (uvr: UntypedVarRef sig k): VarRef sig k uvr_tau := *)
+(*   uvr_m. *)
+(* Hint Extern 1 (UntypedVarRef ?sig ?k) => *)
+(*   exact {| uvr_m := projT2 (must (assoc k sig)) |} : typeclass_instances. *)
 
-Notation "'let' a ':=' b 'in' c" :=
-  (Bind a b c)
-    (in custom tkoika at level 91,
-        a custom tkoika_var at level 1,
-        right associativity,
-        format "'[v' 'let'  a  ':='  b  'in' '/' c ']'").
-Notation "a ';' b" :=
-  (Seq a b)
-    (in custom tkoika at level 90,
-        format "'[v' a ';' '/' b ']'" ).
-Notation "'set' a ':=' b" :=
-  (Assign (k := a) _ b)
-    (in custom tkoika at level 89,
-        a custom tkoika_var at level 1,
-        format "'set'  a  ':='  b").
-Notation "'(' a ')'" :=
-  (a)
-    (in custom tkoika at level 1,
-        a custom tkoika,
-        format "'[v' '(' a ')' ']'").
+Class VarRef {var_t} (sig: tsig var_t) (k: var_t) (tau: type) :=
+  vr_m : member (k, tau) sig.
 
-(* Notation "instance  '.(' method ')' args" := *)
-(*   (USugar (UCallModule instance _ method args)) *)
-(*     (in custom tkoika at level 1, *)
-(*         instance constr at level 0, *)
-(*         method constr, *)
-(*         args custom tkoika_args at level 99). *)
-(* Notation "'{' method '}' args" := *)
-(*   (USugar (UCallModule id _ method args)) *)
-(*     (in custom tkoika at level 1, *)
-(*         method constr at level 200, *)
-(*         args custom tkoika_args at level 99, *)
-(*         only parsing). *)
-(* Notation "method args" := *)
-(*   (USugar (UCallModule id _ method args)) *)
-(*     (in custom tkoika at level 1, *)
-(*         method constr at level 0, *)
-(*         args custom tkoika_args at level 99, *)
-(*         only parsing). *)
+(* Specify that TC resolution shouldn't guess sig or k, but may guess tau. *)
+Hint Mode VarRef + ! ! - : typeclass_instances.
+
+(* Teach Coq how to find a variable in context *)
+Hint Extern 1 (VarRef ?sig ?k _) =>
+  exact (projT2 (must (assoc k sig))) : typeclass_instances.
+
+(* This notation uses ident_to_string and "a constr" instead of "a custom
+   tkoika_var" to avoid a conflict with the notation for function calls *)
 
 Notation "a" :=
-  (Var (k := a) _)
+  (Var (_: VarRef _ (ident_to_string a) _))
   (* (match a with *)
   (*  | k => Var (k := k) *)
   (*            ltac:( *)
@@ -188,10 +156,82 @@ Notation "a" :=
   (*          | |- VarRef ?sig ?k _ => exact (projT2 (must (assoc k sig))) *)
   (*          end) *)
   (* end) *)
-    (in custom tkoika at level 1, a custom tkoika_var at level 0, only parsing).
-Notation "a" :=
+    (in custom tkoika at level 1,
+        a constr at level 0,
+        only parsing).
+Notation "'&' a" :=              (* FIXME Parsing.v *)
   (Var (k := a) _)
-    (in custom tkoika at level 1, a custom tkoika_var at level 0, only printing).
+    (in custom tkoika at level 1,
+        a constr at level 0,
+        format "'&' a").
+
+Check <{ x }>.
+
+(* Koika *)
+
+(* FIXME Parsing.v only parsing *)
+Notation "'fail'" :=
+  (Fail _)
+    (in custom tkoika at level 0,
+        format "'fail'",
+        only parsing).
+Notation "'fail' '(' t ')'" :=
+  (Fail (bits_t t))
+    (in custom tkoika,
+        t constr at level 0,
+        format "'fail' '(' t ')'",
+        only parsing).
+Notation "'fail@' t" :=
+  (Fail t)
+    (in custom tkoika at level 0,
+        t constr at level 0,
+        format "'fail@' t").
+
+Check <{ fail }>.
+Check <{ fail(1) }>.
+Check <{ fail@unit_t }>.
+Check <{ fail@(bits_t 1) }>.
+
+Notation "'pass'" :=
+  (Const (tau := bits_t 0) Ob)
+    (in custom tkoika).
+Check <{ pass }>.
+
+Notation "'__'" :=
+  (Const __magic__)
+    (in custom tkoika).
+Check <{ __ }>.
+
+Notation "'let' a ':=' b 'in' c" :=
+  (Bind a b c)
+    (in custom tkoika at level 91,
+        a custom tkoika_var at level 1,
+        b custom tkoika at level 91, (* FIXME required by the printer? *)
+        c custom tkoika at level 91, (* FIXME required by the printer? *)
+        format "'[v' 'let'  a  ':='  b  'in' '/' c ']'").
+
+Check <{ let a := pass in pass }>.
+Check <{ let a := let b := pass in pass in pass }>.
+Check <{ let a := pass in let b := pass in pass }>.
+
+Notation "a ';' b" :=
+  (Seq a b)
+    (in custom tkoika at level 90,
+        a custom tkoika,
+        b custom tkoika at level 90,       (* FIXME needed by printer? *)
+        format "'[hv' a ';'  '/' b ']'" ). (* FIXME parsing.v hv *)
+(* Check <{ a; b }>. *)
+(* Check <{ (a; b); c }>. (* FIXME printer ambiguous *) *)
+(* Check <{ a; (b; c) }>. (* FIXME printer ambiguous *) *)
+
+Notation "'set' a ':=' b" :=
+  (Assign (_: VarRef _ a _) b)
+    (in custom tkoika at level 89,
+        a custom tkoika_var at level 1,
+        b custom tkoika at level 89, (* FIXME parsing.v, review *)
+        format "'[hv  ' 'set'  a  ':='  '/' b ']'").
+Check <{ (set a := b); c }>.
+(* Check <{ set a := (b; c) }>.     (* FIXME *) *)
 
 Notation "'read0' '(' reg ')' " :=
   (Read P0 reg)
@@ -207,30 +247,47 @@ Notation "'write0' '(' reg ',' value ')'" :=
   (Write P0 reg value)
     (in custom tkoika,
         reg constr at level 13,
-        format "'write0' '(' reg ',' value ')'").
+        value custom tkoika at level 0, (* FIXME without this this isn't reparseable *)
+        format "'write0' '(' reg ','  value ')'").
 Notation "'write1' '(' reg ',' value ')'" :=
   (Write P1 reg value)
     (in custom tkoika,
         reg constr at level 13,
-        format "'write1' '(' reg ',' value ')'").
+        value custom tkoika at level 0, (* FIXME without this this isn't reparseable *)
+        format "'write1' '(' reg ','  value ')'").
 
-(* FIXME: need better way to infer the argument in Const *)
+Check <{ write0(_, read0(_)) }>.
+Check <{ write1(_, read1(_)) }>.
+Check <{ write0(_, $0) }>.
+Check <{ write1(_, let x := $1 in x) }>. (* FIXME not printable *)
 
 Notation "'if' a 'then' t 'else' f" :=
   (If a t f)
     (in custom tkoika at level 86,
+        a custom tkoika at level 86,
+        t custom tkoika at level 86,
+        f custom tkoika at level 86,
         right associativity,
         format "'[v' 'if'  a '/' 'then'  t '/' 'else'  f ']'").
+Check <{ if __ then __ else __ }>.
+Check <{ if __ then __ else __ }>.
+
 Notation "'guard' '(' a ')' " :=
   (If (Unop (Bits1 (Not 1)) a) (Fail (bits_t 0)) (Const (tau := bits_t 0) Ob))
     (in custom tkoika at level 86,
         right associativity,
+        a custom tkoika at level 86,
         format "'guard' '(' a ')'").
+Check <{ guard(__) }>.
+
 Notation "'when' a 'do' t " :=
   (If a t (Const (tau := bits_t 0) Ob))
     (in custom tkoika at level 91,
+        a custom tkoika at level 86,
+        t custom tkoika at level 91,
         right associativity,
-        format "'[v' 'when'  a '/' 'do'  t '/' ']'").
+        format "'[v' 'when'  a '/' 'do'  t ']'"). (* FIXME parsing.v removed final '/' *)
+(* Check <{ when a do t }>. *)
 
 Notation "a '&&' b" :=
   (Binop (Bits2 (And _)) a b)
@@ -343,7 +400,18 @@ Notation "'`' a '`'" :=
     (in custom tkoika at level 99,
         a constr at level 99).
 
-(* FIXME Hint Mode for VarRef *)
+(* Koika_types *)
+Notation "'(' x ':' y ')'" :=
+  (cons (x%string, y) nil)
+    (in custom tkoika_types at level 60,
+        x custom tkoika_var at level 0,
+        y constr at level 12).
+Notation "'(' x ':' y ')'  b" :=
+  (cons (x%string, y) b)
+    (in custom tkoika_types at level 60,
+        x custom tkoika_var at level 0,
+        y constr at level 12).
+
 Notation "'fun' nm args ':' ret '=>' body" :=
   (@Build_InternalFunction'
      string (action _ _ string _ _ (List.rev args) ret)
@@ -365,6 +433,50 @@ Notation "'fun' nm '()' ':' ret '=>' body" :=
         body custom tkoika at level 99,
         format "'[v' 'fun'  nm  '()'   ':'  ret  '=>' '/' body ']'").
 
+(* Koika_args *)
+Declare Custom Entry tkoika_arglist.
+
+Notation "x" :=
+  (CtxCons _ x CtxEmpty)
+    (in custom tkoika_arglist at level 0,
+        x custom tkoika at level 99).
+Notation "x ',' y" :=
+  (CtxCons _ x y)
+    (in custom tkoika_arglist at level 0,
+        x custom tkoika at level 99,
+        y custom tkoika_arglist,
+        right associativity).
+
+Notation "'()'" :=
+  CtxEmpty (in custom tkoika_args).
+Notation "'(' x ')'" :=
+  x (in custom tkoika_args at level 0,
+        x custom tkoika_arglist at level 0).
+
+Notation "instance  '.(' method ')' args" :=
+  (InternalCall
+     (lift_intfun {| lift_fn := instance |} _ method)
+     args)
+    (in custom tkoika at level 1,
+        instance constr at level 0,
+        method constr,
+        args custom tkoika_args at level 99).
+Notation "'{' method '}' args" :=
+  (InternalCall method args)
+    (in custom tkoika at level 1,
+        method constr at level 200,
+        args custom tkoika_args at level 99,
+        only parsing).
+Notation "method args" :=
+  (InternalCall method args)
+    (in custom tkoika at level 1,
+        method constr at level 0,
+        args custom tkoika_args at level 99,
+        only parsing).
+
+(* Check <{ (?[f]: InternalFunction ) (a, b) }>. *)
+(* Check <{ v .( w ) () }>. *)
+
 (* Deprecated *)
 (* Notation "'call' instance method args" := *)
 (*   (USugar (UCallModule instance _ method args)) *)
@@ -385,106 +497,61 @@ Notation "'extcall' method '(' arg ')'" :=
         method constr at level 0,
         arg custom tkoika).
 
-(* Notation "'call0' instance method " := *)
-(*   (USugar (UCallModule instance _ method nil)) *)
-(*     (in custom tkoika at level 98, *)
-(*         instance constr at level 0, *)
-(*         method constr). *)
+Notation "'call0' instance method " :=
+  (InternalCall
+     (lift_intfun {| lift_fn := instance |} _ method)
+     CtxEmpty)
+    (in custom tkoika at level 98,
+        instance constr at level 0,
+        method constr).
 
 Notation "'funcall0' method " :=
   (InternalCall _ method nil)
     (in custom tkoika at level 98,
         method constr at level 0).
 
-(* Definition str tau := *)
-(*   (must (match tau )) *)
-
-Section TypedMacros.
-  Context {pos_t var_t fn_name_t rule_name_t reg_t ext_fn_t: Type}.
-  Context {R: reg_t -> type}
-          {Sigma: ext_fn_t -> ExternalSignature}.
-  Context {REnv : Env reg_t}.
-
-  Notation action := (action pos_t var_t fn_name_t R Sigma).
-
-  Definition struct_sig_of_action {sig tau} (a: action sig tau)
-    : option struct_sig :=
-    match tau with
-    | struct_t sig => Some sig
-    | _ => None
-    end.
-
-  Definition init sig (tau: type) : action sig tau :=
-    let zeroes := Const (tau := bits_t _) (Bits.zeroes (type_sz tau)) in
-    Unop (Conv tau Unpack) zeroes.
-
-  Fixpoint struct_init
-           {sig}
-           (ssig: struct_sig)
-           (initializers: context (fun k_tau => action sig (snd k_tau))
-                            ssig.(struct_fields))
-    : action sig (struct_t ssig) :=
-    let empty := init sig (struct_t ssig) in
-    let mk_subst f := Binop (Struct2 SubstField ssig f) in
-    cfoldli (V := fun k_tau => action sig (snd k_tau))
-            (fun k_tau m a (acc: action sig (struct_t ssig)) =>
-               (mk_subst (existT _ k_tau m)) acc a)
-            initializers empty.
-
-  Fixpoint switch {vk vtau} {sig tau} (m: member (vk, vtau) sig)
-           (default: action sig tau)
-           (branches: list (action sig vtau * action sig tau)) : action sig tau :=
-    match branches with
-    | nil => default
-    | (label, action) :: branches =>
-      If (Binop (Eq _ false) (Var m) label)
-         action (switch m default branches)
-    end.
-End TypedMacros.
-
 Notation must_field sig f :=
   (must (PrimTypeInference.find_field_opt sig f)).
 
-Notation must_field_of_action a f :=
-  (must_field (must (struct_sig_of_action a)) f).
+Class StructField (sig: struct_sig) (f: string) :=
+  sf_idx : struct_index sig.
 
-(* Class StructField (sig: struct_sig) (f: string) := *)
-(*   sf_idx : struct_index sig. *)
+Hint Extern 1 (StructField ?sig ?f) => exact (must_field sig f) : typeclass_instances.
+Hint Mode StructField + + : typeclass_instances.
 
-(* Hint Extern 1 (StructField ?sig ?f) => exact (must_field sig f) : typeclass_instances. *)
-(* Hint Mode StructField + + : typeclass_instances. *)
-
-(* Notation "'get' '(' v ',' f ')'" := *)
-(*   (Unop (Struct1 GetField _ (_: StructField _ f)) v) *)
-(*     (in custom tkoika, *)
-(*         v custom tkoika at level 13, *)
-(*         f custom tkoika_var at level 0, *)
-(*         format "'get' '(' v ','  f ')'"). *)
-
-Notation "'getbits' '(' sig ',' v ',' f ')'" :=
-  (Unop (Bits1 (GetFieldBits sig (must_field sig f))) v)
+Notation "'get@' sig '(' v ',' f ')'" :=
+  (Unop (Struct1 GetField sig (_: StructField sig f)) v)
     (in custom tkoika,
-        sig constr at level 11,
+        sig constr at level 0,
         v custom tkoika at level 13,
         f custom tkoika_var at level 0,
-        format "'getbits' '(' sig ','  v ','  f ')'").
+        format "'get@' sig '(' v ','  f ')'").
 
-(* Notation "'subst' '(' v ',' f ',' a ')'" := *)
-(*   (Binop (Struct2 SubstField _ (_: StructField _ f)) v a) *)
-(*     (in custom tkoika, *)
-(*         v custom tkoika at level 13, *)
-(*         a custom tkoika at level 13, *)
-(*         f custom tkoika_var at level 0, *)
-(*         format "'subst' '(' v ','  f ',' a ')'"). *)
-
-Notation "'substbits' '(' sig ',' v ',' f ',' a ')'" :=
-  (Binop (Bits2 (SubstFieldBits sig (must_field sig f))) v a)
+Notation "'getbits@' sig '(' v ',' f ')'" :=
+  (Unop (Bits1 (GetFieldBits sig (must_field sig f))) v)
     (in custom tkoika,
-        sig constr at level 11,
+        sig constr at level 0,  (* FIXME parsing.v level *)
+        v custom tkoika at level 13,
+        f custom tkoika_var at level 0,
+        format "'getbits@' sig '(' v ','  f ')'").
+
+Notation "'subst@' sig '(' v ',' f ',' a ')'" :=
+  (Binop (Struct2 SubstField sig (_: StructField sig f)) v a)
+    (in custom tkoika,
+        sig constr at level 0,
         v custom tkoika at level 13,
         a custom tkoika at level 13,
         f custom tkoika_var at level 0,
-        format "'substbits' '(' sig ','  v ','  f ',' a ')'").
+        format "'subst@' sig '(' v ','  f ',' a ')'").
+
+Notation "'substbits@' sig '(' v ',' f ',' a ')'" :=
+  (Binop (Bits2 (SubstFieldBits sig (must_field sig f))) v a)
+    (in custom tkoika,
+        sig constr at level 0,
+        v custom tkoika at level 13,
+        a custom tkoika at level 13,
+        f custom tkoika_var at level 0,
+        format "'substbits@' sig '(' v ','  f ','  a ')'"). (* FIXME parsing.v spacing *)
 
 Declare Custom Entry tkoika_structs_init.
 
@@ -515,6 +582,19 @@ Notation "'enum' sig '{' name '}'" :=
         sig constr at level 1,
         name custom tkoika_var at level 1).
 
+(* Koika_branches *)
+Notation "x '=>' a " :=
+  (cons (x, a) nil)
+    (in custom tkoika_branches at level 60,
+        x custom tkoika at level 99,
+        a custom tkoika at level 89).
+Notation "arg1 '|' arg2" :=
+  (app arg1 arg2)
+    (in custom tkoika_branches at level 13,
+        arg1 custom tkoika_branches,
+        arg2 custom tkoika_branches,
+        format "'[v' arg1 ']' '/' '|'  '[v' arg2 ']'").
+
 Notation "'match' term 'with' '|' branches 'return' 'default' ':' default 'end'" :=
   (Bind "__reserved__matchPattern" term
         (switch (MemberHd ("__reserved__matchPattern", _) _)
@@ -524,12 +604,6 @@ Notation "'match' term 'with' '|' branches 'return' 'default' ':' default 'end'"
         branches custom tkoika_branches,
         default custom tkoika,
         format "'match'  term  'with' '/' '[v'  '|'  branches '/' 'return'  'default' ':' default ']' 'end'").
-
-Notation "'#' s" :=
-  (Const (tau := bits_t _) s)
-    (in custom tkoika at level 98,
-        s constr at level 0,
-        only parsing).
 
 Module Type Tests.
   Parameter pos_t : Type.
@@ -551,29 +625,29 @@ Module Type Tests.
   (* With that instead of the typeclass we'll need to propagate top-down everywhere. *)
   (* Arguments Seq {pos_t var_t fn_name_t reg_t ext_fn_t}%type_scope {R Sigma}%function_scope {sig tau} &. *)
 
-  Definition test_2 : action R Sigma [("u", unit_t); ("v", unit_t)] _ :=
+  Program Definition test_2 : action R Sigma [("u", unit_t); ("v", unit_t)] _ :=
     <{ u; v }>.
   Definition test_3 : action R Sigma [("v", unit_t)] _ :=
-    <{ set v := magic }>.
+    <{ set v := __ }>.
 
   Definition test_1 : action R Sigma [] (bits_t 3) :=
-    <{ let v := fail(2) in magic }>.
+    <{ let v := fail(2) in __ }>.
   Definition test_1' : action R Sigma [] _ :=
     <{ let v := fail(2) in v }>.
   Definition test_2' : action R Sigma [] unit_t :=
-    <{ magic; magic }>.
+    <{ __; __ }>.
   Definition test_3' : action R Sigma [("v", unit_t)] unit_t :=
-    <{ set v := magic; magic }>.
+    <{ set v := __; __ }>.
   Definition test_4 : action R Sigma [("v", unit_t)] _ :=
-    <{ magic; set v := magic }>.
+    <{ __; set v := __ }>.
   Definition test_5 : action R Sigma [("v", unit_t)] unit_t :=
-    <{ let v := set v := magic in magic }>.
+    <{ let v := set v := __ in __ }>.
   Definition test_6 : action R Sigma [("v", unit_t)] unit_t :=
-    <{ let v := set v := magic; pass in magic; magic }>.
+    <{ let v := set v := __; pass in __; __ }>.
   Definition test_7 : action R Sigma [("v", unit_t)] unit_t :=
-    <{ (let v := (set v := magic); pass in magic; magic) }>.
+    <{ (let v := (set v := __); pass in __; __) }>.
   Definition test_8 : action R Sigma [("v", unit_t)] unit_t :=
-    <{ (let v := set v := magic; pass in magic); magic }>.
+    <{ (let v := set v := __; pass in __); __ }>.
   Inductive test : Set := rData (n: nat).
   Definition R_test (reg: test) := match reg with rData n => bits_t n end.
   Definition test_9 : action R Sigma [] _ :=
@@ -581,10 +655,10 @@ Module Type Tests.
   Definition test_10 : forall (idx: nat), action R_test Sigma [] (bits_t idx) :=
     (fun idx => <{ read0(rData idx) }>).
   Definition test_11 : action R Sigma [("v", unit_t)] unit_t :=
-    <{ (let v := read0(data0) in write0(data0, magic)); fail }>.
+    <{ (let v := read0(data0) in write0(data0, __)); fail }>.
   Definition test_12 : action R Sigma [] unit_t :=
     <{ (let v := if fail then read0(data0) else fail in
-        write0(data0, magic)); fail }>.
+        write0(data0, __)); fail }>.
 
   (* We're using Program Definition to work around quirks of Coq's type system. The alternative would be to use bidirectionality hints, but it's not robust: it breaks e.g. when specifying the return type of a concatenation, because without the argument we can't check that the concatenation has the right size.  *)
   (* Arguments Binop {pos_t}%type_scope {var_t fn_name_t reg_t ext_fn_t}%type_scope {R Sigma}%function_scope {sig} fn &. *)
@@ -606,7 +680,7 @@ Module Type Tests.
   Definition test_16' : action R Sigma [] _ :=
     <{ read0(data0) && read0(data0) }>.
   Definition test_17 : action R Sigma [] _ :=
-    <{ !read0(data1) && magic}>.
+    <{ !read0(data1) && __}>.
 
   Program Definition test_18 : action R Sigma [("v", bits_t 32)] _ :=
     <{ !read0(data0) && v }>.
@@ -628,24 +702,24 @@ Module Type Tests.
   Next Obligation. Admitted.
 
   Program Definition test_20' : action R Sigma [("v", bits_t 32)] _ :=
-    <{ (v[magic :+ 3] ++ v) && (v[magic :+ 35]) }>.
+    <{ (v[__ :+ 3] ++ v) && (v[__ :+ 35]) }>.
   Program Definition test_20'' : action R Sigma [("v", bits_t 32); ("w", bits_t 16)] (bits_t 51) :=
-    <{ (v ++ w ++ v[magic :+ 3]) }>.
+    <{ (v ++ w ++ v[__ :+ 3]) }>.
 
   Notation InternalFunction sig tau := (InternalFunction pos_t string fn_name_t R Sigma sig tau).
 
   Definition test_23 : InternalFunction _ _ :=
-    <{ fun test (arg1 : (bits_t 3)) (arg2 : bits_t 2) : bits_t 4 => magic }>.
+    <{ fun test (arg1 : (bits_t 3)) (arg2 : bits_t 2) : bits_t 4 => __ }>.
 
   Definition test_24 : forall sz: nat, InternalFunction _ _ :=
-    (fun sz => <{ fun test (arg1 : bits_t sz) (arg1 : bits_t sz) : bits_t sz  => magic}>).
+    (fun sz => <{ fun test (arg1 : bits_t sz) (arg1 : bits_t sz) : bits_t sz  => __}>).
   Definition test_25 : forall sz: nat, InternalFunction _ _ :=
-    (fun sz => <{fun test (arg1 : bits_t sz ) : bits_t sz => let oo := pass >> pass in magic}>).
+    (fun sz => <{fun test (arg1 : bits_t sz ) : bits_t sz => let oo := pass >> pass in __}>).
   Definition test_26 : forall sz: nat, InternalFunction _ _ :=
-    (fun sz => <{ fun test () : bits_t sz  => magic }>).
-  Program Definition test_27 : action R Sigma [("w", bits_t 1)] _ :=
-    <{
-        (if !(read0(data0)[Ob~0~0~0~0~0]) then
+    (fun sz => <{ fun test () : bits_t sz  => __ }>).
+  Program Definition test_27 : InternalFunction [("w", bits_t 1)] _ :=
+    <{ fun test (w: bits_t 1) : bits_t 4 =>
+        (if !((read0(data0) && |32`d0|)[Ob~0~0~0~0~0]) then
            write0(data0, |32`d0|);
            let u := if (w == Ob~1) then w else w || w
            in write0(data0, |32`d0|)
@@ -656,8 +730,8 @@ Module Type Tests.
   Definition test_28 : action R Sigma [("var", bits_t 5)] unit_t :=
     <{
       match var with
-      | magic => magic
-      return default: magic
+      | __ => __
+      return default: __
       end
     }>.
 
@@ -683,7 +757,12 @@ Module Type Tests.
       unpack(struct_t test_sig, pack(a))
     }>.
 
-  (* Definition test_32 : action R Sigma [("v", struct_t test_sig)] _ := *)
-  (*   <{ subst(v, foo, <{ Ob~1~1 }>) *)
-  (*   }>. *)
+  Set Typeclasses Dependency Order.
+  Set Typeclasses Filtered Unification.
+
+  Definition xx : action R Sigma [("v", struct_t test_sig)] _ :=
+    <{ get@test_sig(v, foo) }>.
+
+  Program Definition test_32 : action R Sigma [("v", struct_t test_sig)] _ :=
+    <{ subst@test_sig(v, foo, Ob~1~1) }>.
 End Tests.

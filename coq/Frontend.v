@@ -44,14 +44,20 @@ Notation "x  =>  y" :=
         x constr at level 0, y constr at level 80,
         no associativity).
 
-Notation "x  =>  y ;  z" :=
+Notation "x => y ; z" :=
   (CtxCons x y z)
     (in custom context_mapping at level 80,
         x constr at level 0, y constr at level 80,
         z custom context_mapping at level 80,
-        right associativity).
+        right associativity,
+        format "x  =>  y ;  '/' z").
 
-Notation "#{  x  }#" := (x) (at level 0, x custom context_mapping at level 200) : context.
+Notation "#{ x }#" :=
+  (x)
+    (at level 0,
+     x custom context_mapping at level 200,
+    format "#{  '[v' x ']'  }#")
+  : context.
 
 (* FIXME *)
 Declare Scope bits_printing.
