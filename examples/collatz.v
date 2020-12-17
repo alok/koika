@@ -1,5 +1,25 @@
 (*! Computing terms of the Collatz sequence (Coq version) !*)
-Require Import Koika.Frontend.
+Require Koika.Frontend.
+Require Import NumberParsing.
+
+Module Test.
+  Import Frontend.
+
+  Notation "sz ''b' num" :=
+    (Const (tau := bits_t sz) (tc_compute ((must_bits (decode_bitstring_from_bits sz num%bitstrings)): bits_t sz)))
+      (in custom tkoika at level 1, sz constr at level 0, num constr at level 0, no associativity, only parsing).
+
+  Definition t : action (fun _: unit => bits_t 0) empty_Sigma [] (bits_t 1) :=
+    <{ let a := 1'b0 in let b := 1'b1 in a && b }>.
+End Test.
+
+Open Scope string_scope.
+Import Vect.
+Import VectNotations.
+Require Import Lists.List.
+Import ListNotations.
+Eval simpl in ltac:(let t := eval unfold Test.t in Test.t in exact t).
+
 
 Module Collatz.
   Inductive reg_t := r0.
@@ -18,6 +38,12 @@ Module Collatz.
     | r0 => Bits.of_nat sz 18
     end.
 
+  Notation "sz ''b' num" :=
+    (Const (tau := bits_t sz) (tc_compute ((must_bits (decode_bitstring_from_bits sz num%bitstrings)): bits_t sz)))
+      (in custom tkoika at level 1, sz constr at level 0, num constr at level 0, no associativity, only parsing).
+
+  Check <{ let a := 4'b0 in let b := 4'b1 in a + b }>.
+
   Definition times_three : InternalFunction R empty_Sigma _ _ :=
     <{ fun times_three (bs: bits_t 16) : bits_t 16 =>
          (bs << Ob~1) + bs }>.
@@ -32,9 +58,9 @@ Module Collatz.
 
   Program Definition _multiply : rule R empty_Sigma :=
     <{ let v := read1(r0) in
-       let odd := v[Ob~0~0~0~0] in
+       let odd := v[4'b0] in
        if odd then
-         write1(r0, funcall times_three(v) + Ob~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~1)
+         write1(r0, times_three(v) + 16'b1)
        else
          fail }>.
 
