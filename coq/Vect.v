@@ -1,7 +1,9 @@
 (*! Utilities | Vectors and bitvector library !*)
 Require Import Coq.Lists.List Coq.Bool.Bool.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
+Require Import Coq.Arith.Arith.
 Require Export Coq.NArith.NArith.          (* Coq bug: If this isn't exported, other files can't import Vect.vo *)
+Require Import Coq.ZArith.ZArith.
 Require Import Koika.EqDec.
 Import EqNotations.
 
@@ -107,8 +109,8 @@ Proof.
   induction sz; cbn; intros.
   - reflexivity.
   - destruct n.
-    + omega.
-    + try rewrite IHsz by omega; reflexivity.
+    + lia.
+    + rewrite IHsz by lia; reflexivity.
 Qed.
 
 Definition index_of_nat_lt (sz n: nat)
@@ -116,7 +118,7 @@ Definition index_of_nat_lt (sz n: nat)
 Proof.
   destruct (index_of_nat sz n) as [idx | ] eqn:Heq; intros Hlt.
   - exact idx.
-  - exfalso; apply index_of_nat_none_ge in Heq; omega.
+  - exfalso; apply index_of_nat_none_ge in Heq; lia.
 Defined.
 
 Fixpoint largest_index sz : index (S sz) :=
@@ -188,7 +190,7 @@ Fixpoint vect_app {T} {sz1 sz2} (v1: vect T sz1) (v2: vect T sz2) {struct sz1} :
 
 Fixpoint vect_app_nil_cast n:
   n = n + 0.
-Proof. destruct n; cbn; auto. Defined.
+Proof. destruct n; cbn; [reflexivity| rewrite <- vect_app_nil_cast; reflexivity]. Defined.
 
 Lemma vect_app_nil :
   forall {T sz} (v: vect T sz) (v0: vect T 0),
@@ -199,8 +201,9 @@ Proof.
   induction sz; destruct v; cbn.
   - reflexivity.
   - rewrite IHsz.
-    unfold f_equal_nat, f_equal.
-    rewrite <- vect_app_nil_cast; reflexivity.
+    unfold f_equal.
+    unfold f_equal_nat.
+    rewrite <- vect_app_nil_cast ; reflexivity.
 Defined.
 
 Lemma vect_app_cast_l {T} {sz1 sz1' sz2}:
@@ -261,6 +264,17 @@ Fixpoint vect_nth {T n} (v: vect T n) (idx: index n) {struct n} : T :=
             | anotherone idx => vect_nth (vect_tl v) idx
             end
   end v idx.
+
+Lemma vect_nth_inj {T n} (v1 v2: vect T n):
+  (forall idx, vect_nth v1 idx = vect_nth v2 idx) ->
+  v1 = v2.
+Proof.
+  induction n; destruct v1, v2; cbn; intros H.
+  - reflexivity.
+  - f_equal.
+    apply (H thisone).
+    apply IHn; intros; apply (H (anotherone _)).
+Qed.
 
 Fixpoint vect_nth_const {T} (n: nat) (t: T) idx {struct n} :
   vect_nth (vect_const n t) idx = t.
@@ -404,7 +418,7 @@ Definition vect_cycle_l {T sz} n (v: vect T sz) :=
 Definition vect_cycle_r {T sz} n (v: vect T sz) :=
   vect_dotimes vect_cycle_r1 n v.
 
-Fixpoint vect_skipn_cast n:
+Definition vect_skipn_cast n:
   n = n - 0.
 Proof. destruct n; cbn; auto. Defined.
 
@@ -556,7 +570,7 @@ Proof.
   unfold vect_extend_end_firstn, vect_extend_end; intros.
   rewrite <- eq_trans_rew_distr.
   set (eq_trans _ _) as Heq; clearbody Heq.
-  revert Heq; replace (n - Nat.min n sz) with 0 by omega; intros.
+  revert Heq; replace (n - Nat.min n sz) with 0 by lia; intros.
   rewrite vect_app_nil.
   rewrite <- eq_trans_rew_distr.
   set (eq_trans _ _) as Heq'; clearbody Heq'.
@@ -1041,12 +1055,25 @@ Module Bits.
   Definition lsl {sz} nplaces (b: bits sz) :=
     vect_dotimes lsl1 nplaces b.
 
+  Definition rotate_l {sz} nplaces (b: bits sz) :=
+    vect_cycle_l nplaces b.
+  Definition rotate_r {sz} nplaces (b: bits sz) :=
+    vect_cycle_r nplaces b.
+
   Section Casts.
     Fixpoint to_N {sz: nat} (bs: bits sz) {struct sz} : N :=
       match sz return bits sz -> N with
       | O => fun _ => 0%N
       | S n => fun bs => ((if hd bs then 1 else 0) + 2 * to_N (tl bs))%N
       end bs.
+
+    Lemma to_N_S {sz: nat} (bs: bits (S sz)) :
+      to_N bs = ((if hd bs then 1 else 0) + 2 * to_N (tl bs))%N.
+    Proof. reflexivity. Qed.
+
+    Lemma to_N_cons {sz: nat} hd (tl: bits sz) :
+      to_N (cons hd tl) = ((if hd then 1 else 0) + 2 * to_N tl)%N.
+    Proof. reflexivity. Qed.
 
     Global Arguments to_N sz / !bs.
 
@@ -1056,7 +1083,7 @@ Module Bits.
     Definition to_index {sz} sz' (bs: bits sz) : option (index sz') :=
       index_of_nat sz' (to_nat bs).
 
-    Fixpoint to_2cZ {sz} (bs: bits sz) : Z :=
+    Definition to_2cZ {sz} (bs: bits sz) : Z :=
       if msb bs then
         match to_N (neg bs) with
         | N0 => -1
@@ -1107,8 +1134,8 @@ Module Bits.
         to_N (rew eqn in bs) = to_N bs.
     Proof. destruct eqn; reflexivity. Qed.
 
-    Lemma to_N_zeroes :
-      forall sz, to_N (zeroes sz) = 0%N.
+    Lemma to_N_zeroes {sz} :
+      to_N (zeroes sz) = 0%N.
     Proof. induction sz; simpl; try rewrite IHsz; reflexivity. Qed.
 
     Lemma to_N_app :
@@ -1121,19 +1148,56 @@ Module Bits.
         rewrite IHsz'; lia.
     Qed.
 
-    Lemma to_N_of_N :
+    Lemma of_N_double sz n:
+      of_N (S sz) (N.double n) = cons false (of_N sz n).
+    Proof. destruct n; reflexivity. Qed.
+
+    Lemma of_N_succ_double sz n:
+      of_N (S sz) (N.succ_double n) = cons true (of_N sz n).
+    Proof. destruct n; reflexivity. Qed.
+
+    Lemma N_double_div_2 n :
+      (N.double n / 2 = n)%N.
+    Proof.
+      replace (N.double n) with (N.b2n false + 2 * n)%N by reflexivity.
+      apply N.add_b2n_double_div2.
+    Qed.
+
+    Lemma N_succ_double_div_2 n :
+      (N.succ_double n / 2 = n)%N.
+    Proof.
+      replace (N.succ_double n) with (N.b2n true + 2 * n)%N
+        by (simpl N.b2n; rewrite N.succ_double_spec; lia).
+      apply N.add_b2n_double_div2.
+    Qed.
+
+
+
+    Lemma to_N_of_N_mod :
+      forall n sz,
+        to_N (of_N sz n) = (n mod 2 ^ N.of_nat sz)%N.
+    Proof.
+      induction n using N.binary_ind.
+      1: solve [intros; apply to_N_zeroes].
+      all: destruct sz; [ rewrite N.mod_1_r; reflexivity | ].
+      all: rewrite ?of_N_double, ?of_N_succ_double, ?to_N_cons, ?IHn.
+      all: rewrite ?Nat2N.inj_succ, ?N.pow_succ_r'.
+      all: set (N.of_nat sz) as nz.
+      all: pose proof N.pow_nonzero 2 nz ltac:(lia).
+      all: rewrite !N.mod_eq, <- !N.div_div, ?N_double_div_2, ?N_succ_double_div_2 by lia.
+      all: rewrite ?(N.double_spec n), ?(N.succ_double_spec n).
+      - lia.
+      - pose proof N.mul_div_le n (2 ^ nz).
+        rewrite N.mul_sub_distr_l, N.add_sub_assoc; lia.
+    Qed.
+
+    Lemma to_N_of_N_lt :
       forall n sz,
         (n < N.pow 2 (N.of_nat sz))%N ->
         to_N (of_N sz n) = n.
     Proof.
-      destruct n; simpl.
-      - intros; apply to_N_zeroes.
-      - induction p; intros sz Hlt;
-          destruct sz; try solve [inversion Hlt];
-            cbn -[N.mul N.add];
-            rewrite Nat2N.inj_succ in Hlt.
-        1, 2: solve [intros; rewrite IHp; eauto using N_lt_pow2_succ_1, N_lt_pow2_succ].
-        rewrite to_N_zeroes; reflexivity.
+      intros.
+      rewrite to_N_of_N_mod, N.mod_small by assumption; reflexivity.
     Qed.
 
     Lemma of_N_inj :
@@ -1144,7 +1208,7 @@ Module Bits.
         n1 = n2.
     Proof.
       intros * Hlt1 Hlt2 Heq%(f_equal to_N).
-      rewrite !to_N_of_N in Heq by assumption.
+      rewrite !to_N_of_N_lt in Heq by assumption.
       assumption.
     Qed.
 
@@ -1167,9 +1231,8 @@ Module Bits.
       auto using to_N_inj.
     Qed.
 
-    Lemma to_N_bounded:
-      forall sz (bs: bits sz),
-        (to_N bs < 2 ^ N.of_nat sz)%N.
+    Lemma to_N_bounded {sz} (bs: bits sz) :
+      (to_N bs < 2 ^ N.of_nat sz)%N.
     Proof.
       induction sz; destruct bs; cbn -[N.pow N.mul]; intros.
       - repeat econstructor.
@@ -1178,11 +1241,25 @@ Module Bits.
           specialize (IHsz vtl0); rewrite Heq in IHsz; nia.
     Qed.
 
+    Lemma to_N_neg sz (bs: bits sz):
+      to_N (neg bs) = (2 ^ (N.of_nat sz) - 1 - to_N bs)%N.
+    Proof.
+      induction sz.
+      - reflexivity.
+      - rewrite !to_N_S.
+        change (tl (neg (bs))) with (neg (tl bs));
+          change (hd (neg (bs))) with (negb (hd bs)).
+        rewrite !IHsz.
+        pose proof to_N_bounded (tl bs).
+        all: rewrite ?Nat2N.inj_succ, ?N.pow_succ_r'.
+        all: destruct (hd bs); simpl negb; cbv zeta iota; lia.
+    Qed.
+
     Lemma of_N_to_N :
       forall sz (bs: bits sz),
         of_N sz (to_N bs) = bs.
     Proof.
-      auto using to_N_inj, to_N_of_N, to_N_bounded.
+      auto using to_N_inj, to_N_of_N_lt, to_N_bounded.
     Qed.
 
     Lemma nat_lt_pow2_N (sz n: nat):
@@ -1207,7 +1284,7 @@ Module Bits.
         to_nat (of_nat sz n) = n.
     Proof.
       unfold to_nat, of_nat;
-        intros; rewrite to_N_of_N, Nat2N.id;
+        intros; rewrite to_N_of_N_lt, Nat2N.id;
           eauto using nat_lt_pow2_N.
     Qed.
 
@@ -1228,14 +1305,39 @@ Module Bits.
     Definition zero {sz} : bits sz := of_N sz N.zero.
     Definition one {sz} : bits sz := of_N sz N.one.
 
+    Open Scope N_scope.
+
     Definition plus {sz} (bs1 bs2: bits sz) :=
-      Bits.of_N sz (Bits.to_N bs1 + Bits.to_N bs2)%N.
+      of_N sz (to_N bs1 + to_N bs2)%N.
+
+    Lemma to_N_plus {sz} (bs1 bs2: bits sz) :
+      to_N (plus bs1 bs2) = (to_N bs1 + to_N bs2) mod 2 ^ (N.of_nat sz).
+    Proof.
+      unfold plus; rewrite to_N_of_N_mod; reflexivity.
+    Qed.
 
     Definition minus {sz} (bs1 bs2: bits sz) :=
       plus (plus bs1 (neg bs2)) (@one sz).
 
+    Lemma to_N_one {sz} :
+      @to_N sz one = (1 mod 2 ^ N.of_nat sz)%N.
+    Proof. unfold one; rewrite to_N_of_N_mod; reflexivity. Qed.
+
+    Lemma to_N_minus {sz} (bs1 bs2: bits sz) :
+      to_N (minus bs1 bs2) = (2 ^ (N.of_nat sz) + to_N bs1 - to_N bs2) mod 2 ^ (N.of_nat sz).
+    Proof.
+      unfold minus.
+      rewrite !to_N_plus, !to_N_neg, !to_N_one.
+      pose proof to_N_bounded bs1.
+      pose proof to_N_bounded bs2.
+      pose proof Npow2_ge_1.
+      set (to_N bs1) as n1; set (to_N bs2) as n2; set (2 ^ N.of_nat sz) as mz.
+      rewrite <- N.add_mod by lia.
+      f_equal; lia.
+    Qed.
+
     Definition mul {sz1 sz2} (bs1: bits sz1) (bs2: bits sz2) :=
-      Bits.of_N (sz1 + sz2) (Bits.to_N bs1 * Bits.to_N bs2)%N.
+      of_N (sz1 + sz2) (to_N bs1 * to_N bs2)%N.
   End Arithmetic.
 
   Section Comparisons.
@@ -1430,4 +1532,4 @@ Fixpoint z_range start len :=
   | S len => start :: z_range (Z.succ start) len
   end.
 
-(* Eval simpl in (List.map (fun z => Bits.of_2cZ 4 z) (range (-8) 16)). *)
+(* Eval simpl in (List.map (fun z => Bits.of_2cZ 4 z) (z_range (-8) 16)). *)

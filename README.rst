@@ -793,6 +793,11 @@ The following list shows the current state of the repo:
    - |coq/ProgramTactics.v|_: Tactics for proving user-defined circuits
 
 ``etc/``
+   ``ae/``
+
+   ``bench/``
+      - |etc/bench/verilator.sh|_: Compile a Bluespec design with Verilator
+
    - |etc/configure|_: Generate dune files for examples/ and tests/
 
 ``examples/``
@@ -806,6 +811,11 @@ The following list shows the current state of the repo:
 
    ``rv/``
       ``etc/``
+         ``bsv/``
+            ``rv32_bsv/``
+               - |examples/rv/etc/bsv/rv32_bsv/top_bsv_verilator.cpp|_: Default driver for |koika| programs compiled to C++ using Verilator
+
+
          ``nangate45/``
             - |examples/rv/etc/nangate45/synth.sh|_: Yosys synthesis script for Nangate Open Cell Library (45nm)
 
@@ -847,9 +857,8 @@ The following list shows the current state of the repo:
    - |examples/gcd_machine.v|_: Computing GCDs
    - |examples/method_call.v|_: Calling methods of internal modules
    - |examples/pipeline.v|_: Building simple pipelines
-   - |examples/uart.v|_: UART transmitter
+   - |examples/pipeline_tutorial.v|_: Tutorial: Simple arithmetic pipeline
    - |examples/vector.v|_: Representing vectors of registers using Coq inductives
-   - |examples/wps.v|_: Tutorial: Simple arithmetic pipeline
 
 ``ocaml/``
    ``backends/``
@@ -1016,8 +1025,16 @@ The following list shows the current state of the repo:
 .. _coq/Types.v: coq/Types.v
 .. |coq/Vect.v| replace:: ``Vect.v``
 .. _coq/Vect.v: coq/Vect.v
+.. |etc/ae/setup.sh| replace:: ``setup.sh``
+.. _etc/ae/setup.sh: etc/ae/setup.sh
+.. |etc/bench.sh| replace:: ``bench.sh``
+.. _etc/bench.sh: etc/bench.sh
+.. |etc/bench/verilator.sh| replace:: ``verilator.sh``
+.. _etc/bench/verilator.sh: etc/bench/verilator.sh
 .. |etc/configure| replace:: ``configure``
 .. _etc/configure: etc/configure
+.. |etc/summarize.py| replace:: ``summarize.py``
+.. _etc/summarize.py: etc/summarize.py
 .. |examples/collatz.lv| replace:: ``collatz.lv``
 .. _examples/collatz.lv: examples/collatz.lv
 .. |examples/collatz.v| replace:: ``collatz.v``
@@ -1054,6 +1071,8 @@ The following list shows the current state of the repo:
 .. _examples/method_call.v: examples/method_call.v
 .. |examples/pipeline.v| replace:: ``pipeline.v``
 .. _examples/pipeline.v: examples/pipeline.v
+.. |examples/pipeline_tutorial.v| replace:: ``pipeline_tutorial.v``
+.. _examples/pipeline_tutorial.v: examples/pipeline_tutorial.v
 .. |examples/rv/Multiplier.v| replace:: ``Multiplier.v``
 .. _examples/rv/Multiplier.v: examples/rv/Multiplier.v
 .. |examples/rv/MultiplierCorrectness.v| replace:: ``MultiplierCorrectness.v``
@@ -1064,6 +1083,8 @@ The following list shows the current state of the repo:
 .. _examples/rv/RVEncoding.v: examples/rv/RVEncoding.v
 .. |examples/rv/Scoreboard.v| replace:: ``Scoreboard.v``
 .. _examples/rv/Scoreboard.v: examples/rv/Scoreboard.v
+.. |examples/rv/etc/bsv/rv32_bsv/top_bsv_verilator.cpp| replace:: ``top_bsv_verilator.cpp``
+.. _examples/rv/etc/bsv/rv32_bsv/top_bsv_verilator.cpp: examples/rv/etc/bsv/rv32_bsv/top_bsv_verilator.cpp
 .. |examples/rv/etc/cvc64.sh| replace:: ``cvc64.sh``
 .. _examples/rv/etc/cvc64.sh: examples/rv/etc/cvc64.sh
 .. |examples/rv/etc/elf.hpp| replace:: ``elf.hpp``
@@ -1100,12 +1121,8 @@ The following list shows the current state of the repo:
 .. _examples/rv/rv32e.v: examples/rv/rv32e.v
 .. |examples/rv/rv32i.v| replace:: ``rv32i.v``
 .. _examples/rv/rv32i.v: examples/rv/rv32i.v
-.. |examples/uart.v| replace:: ``uart.v``
-.. _examples/uart.v: examples/uart.v
 .. |examples/vector.v| replace:: ``vector.v``
 .. _examples/vector.v: examples/vector.v
-.. |examples/wps.v| replace:: ``wps.v``
-.. _examples/wps.v: examples/wps.v
 .. |ocaml/backends/coq.ml| replace:: ``coq.ml``
 .. _ocaml/backends/coq.ml: ocaml/backends/coq.ml
 .. |ocaml/backends/cpp.ml| replace:: ``cpp.ml``

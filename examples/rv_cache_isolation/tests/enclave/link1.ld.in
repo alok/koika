@@ -1,0 +1,37 @@
+#include <parameters.h>
+
+OUTPUT_ARCH("riscv")
+ENTRY(_start1)
+
+MEMORY {
+  enclave1 (rx) : ORIGIN = _ENCLAVE0, LENGTH = _ENCLAVE_SIZE 
+}
+
+SECTIONS {
+  . = ORIGIN(enclave1);
+  .text : {
+    PROVIDE ( _start = . );
+    KEEP ( *(.text.init) )
+         *(.text.*)
+         *(.text)
+  } > enclave1 = 0x0
+
+  .rodata : {
+    *(.rodata)
+    *(.rodata.*)
+  } > enclave1 = 0x0
+
+  .data : {
+    *(.data)
+    *(.data.*)
+  } > enclave1  = 0x0
+
+  .bss : {
+    *(.bss)
+    *(.bss.*)
+    *(.sbss*)
+  } > enclave1 = 0x0
+
+
+}
+

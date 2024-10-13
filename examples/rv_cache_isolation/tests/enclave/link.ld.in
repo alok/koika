@@ -1,0 +1,202 @@
+#include <parameters.h>
+
+OUTPUT_ARCH("riscv")
+ENTRY(_start0)
+
+MEMORY {
+  coreinit0 (rx) : ORIGIN = _START0, LENGTH = _INIT_LENGTH
+  enclave0 (rx) : ORIGIN = _ENCLAVE0, LENGTH = _ENCLAVE_SIZE 
+  coreinit1 (rx) : ORIGIN = _START1, LENGTH =  _INIT_LENGTH
+  enclave1 (rx) : ORIGIN = _ENCLAVE1, LENGTH = _ENCLAVE_SIZE 
+  enclave2 (rx) : ORIGIN = _ENCLAVE2, LENGTH = _ENCLAVE_SIZE
+  enclave3 (rx) : ORIGIN = _ENCLAVE3, LENGTH = _ENCLAVE_SIZE
+  shared01 (rx) : ORIGIN = _SHARED01, LENGTH = _SHARED_REGION_SIZE
+  shared02 (rx) : ORIGIN = _SHARED02, LENGTH = _SHARED_REGION_SIZE
+  shared03 (rx) : ORIGIN = _SHARED03, LENGTH = _SHARED_REGION_SIZE
+  shared12 (rx) : ORIGIN = _SHARED12, LENGTH = _SHARED_REGION_SIZE
+  shared13 (rx) : ORIGIN = _SHARED13, LENGTH = _SHARED_REGION_SIZE
+  shared23 (rx) : ORIGIN = _SHARED23, LENGTH = _SHARED_REGION_SIZE
+}
+
+SECTIONS {
+  . = ORIGIN (coreinit0);
+  .text.init0 : {
+    KEEP ( _build/init0.o(.text.init) )  
+  } > coreinit0 = 0x0
+
+  . = ORIGIN(enclave0);
+  .text0 : { 
+    KEEP ( _build/bootloader0.o(.text.bootloader ))
+       _build/bootloader0.o(.text .text.*)
+       _build/enclave0.o(.text .text.*);
+       _build/stack0.o(.text .text.*);
+       _build/mmio0.o(.text .text.*)
+  } > enclave0 = 0x0
+
+  .rodata0 : {
+       _build/enclave0.o(.rodata .rodata.*);
+       _build/stack0.o(.rodata .rodata.*);
+       _build/mmio0.o(.rodata .rodata.*)
+  } > enclave0 = 0x0
+
+  .srodata0 : {
+       _build/enclave0.o(.srodata .srodata.*);
+       _build/stack0.o(.srodata .srodata.*);
+       _build/mmio0.o(.srodata .srodata.*)
+  } > enclave0 = 0x0
+
+
+  .data0 : {
+       _build/enclave0.o(.data .data.*);
+       _build/stack0.o(.data .data.*);
+       _build/mmio0.o(.data .data.*)
+  } > enclave0 = 0x0
+
+  .bss0 : {
+       _build/enclave0.o(.bss .bss.*);
+       _build/stack0.o(.bss .bss.*);
+       _build/mmio0.o(.bss .bss.*)
+  } > enclave0 = 0x0
+
+  .sdata0 : {
+        PROVIDE ( _GLBL0 = .);
+        . = . + 0x04;
+       _build/enclave0.o(.sdata .sdata.*)
+       _build/stack0.o(.sdata .sdata.*)
+       _build/mmio0.o(.sdata .sdata.*)
+  } > enclave0 = 0x0
+
+  . = ORIGIN (coreinit1);
+  .text.init1 : {
+    KEEP ( _build/init1.o(.text.init) )  
+  } > coreinit1 = 0x0
+
+  . = ORIGIN(enclave1);
+  .text1 : { 
+    KEEP ( _build/bootloader1.o(.text.bootloader) )  
+       _build/bootloader1.o(.text .text.*)
+       _build/enclave1.o(.text .text.* );
+       _build/stack1.o(.text );
+       _build/mmio1.o(.text )
+  } > enclave1 = 0x0
+
+  .rodata1 : {
+       _build/enclave1.o(.rodata .rodata.*);
+       _build/stack1.o(.rodata .rodata.*);
+       _build/mmio1.o(.rodata .rodata.*)
+  } > enclave1 = 0x0
+
+  .srodata1 : {
+       _build/enclave1.o(.srodata .srodata.*);
+       _build/stack1.o(.srodata .srodata.*);
+       _build/mmio1.o(.srodata .srodata.*)
+  } > enclave1 = 0x0
+
+
+  .data1 : {
+       _build/enclave1.o(.data .data.*);
+       _build/stack1.o(.data .data.*);
+       _build/mmio1.o(.data .data.*)
+  } > enclave1 = 0x0
+
+  .bss1 : {
+       _build/enclave1.o(.bss .bss.*);
+       _build/stack1.o(.bss .bss.*);
+       _build/mmio1.o(.bss .bss.*)
+  } > enclave1 = 0x0
+
+  .sdata1 : {
+        PROVIDE ( _GLBL1 = .);
+        . = . + 0x04;
+       _build/enclave1.o(.sdata .sdata.*);
+       _build/stack1.o(.sdata .sdata.*);
+       _build/mmio1.o(.sdata .sdata.*)
+  } > enclave1 = 0x0
+
+  . = ORIGIN(enclave2);
+  .text2 : { 
+    KEEP ( _build/bootloader2.o(.text.bootloader) )  
+       _build/bootloader2.o(.text .text.*)
+       _build/enclave2.o(.text .text.*);
+       _build/stack2.o(.text .text.*);
+       _build/mmio2.o(.text .text.*)
+  } > enclave2 = 0x0
+
+  .rodata2 : {
+       _build/enclave2.o(.rodata .rodata.*);
+       _build/stack2.o(.rodata .rodata.*);
+       _build/mmio2.o(.rodata .rodata.*)
+  } > enclave2 = 0x0
+
+  .srodata2 : {
+       _build/enclave2.o(.srodata .srodata.*);
+       _build/stack2.o(.srodata .srodata.*);
+       _build/mmio2.o(.srodata .srodata.*)
+  } > enclave2 = 0x0
+
+
+  .data2 : {
+       _build/enclave2.o(.data .data.*);
+       _build/stack2.o(.data .data.*);
+       _build/mmio2.o(.data .data.*)
+  } > enclave2 = 0x0
+
+  .bss2 : {
+       _build/enclave2.o(.bss .bss.*);
+       _build/stack2.o(.bss .bss.*);
+       _build/mmio2.o(.bss .bss.*)
+  } > enclave2 = 0x0
+
+  .sdata2 : {
+        PROVIDE ( _GLBL2 = .);
+        . = . + 0x04;
+       _build/enclave2.o(.sdata .sdata.*);
+       _build/stack2.o(.sdata .sdata.*);
+       _build/mmio2.o(.sdata .sdata.*)
+  } > enclave2 = 0x0
+
+  . = ORIGIN(enclave3);
+  .text3 : { 
+    KEEP ( _build/bootloader3.o(.text.bootloader) )  
+       _build/bootloader3.o(.text .text.*)
+       _build/enclave3.o(.text .text.*);
+       _build/stack3.o(.text .text.*);
+       _build/mmio3.o(.text .text.*)
+  } > enclave3 = 0x0
+
+  .rodata3 : {
+       _build/enclave3.o(.rodata .rodata.*);
+       _build/stack3.o(.rodata .rodata.*);
+       _build/mmio3.o(.rodata .rodata.*)
+  } > enclave3 = 0x0
+
+  .srodata3 : {
+       _build/enclave3.o(.srodata .srodata.*);
+       _build/stack3.o(.srodata .srodata.*);
+       _build/mmio3.o(.srodata .srodata.*)
+  } > enclave3 = 0x0
+
+  .data3 : {
+       _build/enclave3.o(.data .data.*);
+       _build/stack3.o(.data .data.*);
+       _build/mmio3.o(.data .data.*)
+  } > enclave3 = 0x0
+
+  .bss3 : {
+       _build/enclave3.o(.bss .bss.*);
+       _build/stack3.o(.bss .bss.*);
+       _build/mmio3.o(.bss .bss.*)
+  } > enclave3 = 0x0
+
+  .sdata3 : {
+        PROVIDE ( _GLBL3 = .);
+        . = . + 0x04;
+       _build/enclave3.o(.sdata .sdata.*);
+       _build/stack3.o(.sdata .sdata.*);
+       _build/mmio3.o(.sdata .sdata.*)
+  } > enclave3 = 0x0
+
+  _end = .;
+}
+
+

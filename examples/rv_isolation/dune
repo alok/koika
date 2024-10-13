@@ -1,0 +1,24 @@
+(coq.theory
+ (name rv_isolation)
+ (modules :standard)
+ (theories Koika koika )
+ (libraries core)
+)
+
+
+
+
+;; --- DO NOT EDIT BELOW THIS LINE (use ‘make configure’) ---
+(dirs :standard _objects)
+
+
+;; -*- dune -*-
+(subdir "_objects/rv32i.v"
+ (rule (write-file "rv32i_extr.v"
+                   "Require Coq.extraction.Extraction rv_isolation.rv32i.
+Extraction \"rv32i.ml\" rv32i.prog."))
+ (coq.extraction
+  (prelude rv32i_extr)
+  (extracted_modules rv32i)
+  (theories Koika koika koikaExamples.Enclaves rv_isolation)
+  (flags "-w" "-overriding-logical-loadpath")))

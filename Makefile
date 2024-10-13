@@ -1,5 +1,5 @@
 OBJ_DIR := _obj
-BUILD_DIR := _build/default
+BUILD_DIR := ../../_build/default/deps/koika
 COQ_BUILD_DIR := ${BUILD_DIR}/coq
 OCAML_BUILD_DIR := ${BUILD_DIR}/ocaml
 
@@ -90,7 +90,10 @@ $(dirpath) $(dirpath)/: $(1) ocaml | configure
 endef
 
 TESTS := $(wildcard tests/*.lv) $(wildcard tests/*.v)
-EXAMPLES := $(wildcard examples/*.lv) $(wildcard examples/*.v) examples/rv/rv32i.v examples/rv/rv32e.v
+EXAMPLES := $(wildcard examples/*.lv) $(wildcard examples/*.v) examples/rv/rv32i.v examples/rv/rv32e.v examples/rv_isolation/rv32i.v
+	examples/rv_cache_isolation/rv32i.v
+
+
 
 configure:
 	etc/configure $(filter %.v,${TESTS} ${EXAMPLES})
