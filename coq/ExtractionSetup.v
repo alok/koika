@@ -1,5 +1,6 @@
 (*! Interop | Custom extraction settings (also used by external Kôika programs !*)
 Require Export Coq.extraction.Extraction.
+From Coq Require Import NArith ZArith.
 From Coq.extraction Require Export ExtrOcamlBasic ExtrOcamlString ExtrOcamlNatInt ExtrOcamlZInt.
 
 Require Koika.Types
@@ -12,11 +13,15 @@ Extraction Inline Koika.CircuitGeneration.retVal.
 Extraction Inline Types.argSigs.
 
 Extract Constant Vect.index => int.
-Extract Inductive Vect.index' => int [ "0" "Pervasives.succ" ]
+Extract Inductive Vect.index' => int [ "0" "Stdlib.Int.succ" ]
   "(fun fthisone fanotherone n -> if n = 0 then fthisone () else fanotherone (n - 1))".
 Extract Constant Vect.index_of_nat => "fun sz x -> if x < sz then Some x else None".
 Extract Constant Vect.index_to_nat => "fun _ x -> x".
 Extract Constant Vect.largest_index => "fun x -> x".
+Extract Constant Pos.succ => "Stdlib.Int.succ".
+Extract Constant N.succ => "Stdlib.Int.succ".
+Extract Constant N.pred => "fun n -> Stdlib.Int.max 0 (n-1)".
+Extract Constant N.sub => "fun n m -> Stdlib.Int.max 0 (n-m)".
 
 (* This command makes extraction a bit more predictable *)
 Global Set Extraction KeepSingleton.

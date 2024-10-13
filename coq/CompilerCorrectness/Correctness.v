@@ -42,7 +42,8 @@ Section Thm.
     Proof.
       cbv zeta; intros.
       setoid_rewrite compile_scheduler'_correct.
-      - rewrite scheduler_lowering_correct.
+      - unfold LoweredSemantics.interp_cycle.
+        rewrite scheduler_lowering_correct.
         unfold lower_r, lower_log;
           rewrite SemanticProperties.commit_update_log_map_values, getenv_map;
           reflexivity.

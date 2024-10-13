@@ -28,11 +28,11 @@ all: cuttlesim-tests verilator-tests
 
 # The UART module is written in Kôika too, and copied here from the Examples folder
 uart:
-	$(MAKE) -C ../.. examples/_objects/uart.v/
+	$(MAKE) -C ../../../.. deps/koika/examples/_objects/uart.v/
 	cp ../../examples/_objects/uart.v/uart.v etc/sv/
 
 core:
-	$(MAKE) -C ../.. examples/rv/$(objects_dir)
+	$(MAKE) -C ../../../.. deps/koika/examples/rv/$(objects_dir)
 	$(verbose)cp $(objects_dir)/$(DRIVER)/*.v $(objects_dir)/
 	$(verbose)cp $(objects_dir)/Makefile.$(DUT).conf $(objects_dir)/Makefile.platform.conf
 
@@ -70,7 +70,7 @@ nangate45-retiming: core
 	cd $(objects_dir)/nangate45; SCRIPT_DIR=retiming ./synth.sh
 
 clean:
-	rm -rf $(tests_build) $(cuttlesim) $(verilator) ../../_build/default/examples/rv/
+	rm -rf $(tests_build) $(cuttlesim) $(verilator) ../../../../_build/default/deps/koika/examples/rv/
 
 purge:
 	rm -rf _objects

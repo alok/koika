@@ -48,6 +48,16 @@ Section Syntax.
   | Cons (r: rule_name_t) (s: scheduler)
   | Try (r: rule_name_t) (s1 s2: scheduler)
   | SPos (p: pos_t) (s: scheduler).
+
+  Fixpoint schedule_app (sched1: scheduler) (sched2: scheduler) : scheduler :=
+    match sched1 with
+    | Done => sched2
+    | Cons r s => Cons r (schedule_app s sched2)
+    | Try r s1 s2 => Try r (schedule_app s1 sched2) (schedule_app s2 sched2)
+    | SPos v s => SPos v (schedule_app s sched2)
+    end.
+
+
 End Syntax.
 
 Arguments Lift: clear implicits.

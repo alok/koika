@@ -103,7 +103,7 @@ Module Internals.
   Ltac2 rec derive_show () :=
     Control.enter derive_show_begin; Control.enter derive_show_app.
 
-  Hint Extern 2 (Show _) => ltac2:(derive_show ()) : typeclass_instances.
+  #[global] Hint Extern 2 (Show _) => ltac2:(derive_show ()) : typeclass_instances.
 End Internals.
 
 Ltac derive_show :=
@@ -114,4 +114,5 @@ Module Examples.
   Inductive y := Y0 (_: x) | Y1 .
 
   Definition test (n: nat) : Show y := _.
+
 End Examples.
