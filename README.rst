@@ -44,8 +44,6 @@ Installing dependencies and building from source
 
 * To run C++ simulations: a recent C++ compiler (clang or gcc), ``libboost-dev``, and optionally ``clang-format``.
 
-* To compile this README, you need ``sphinx`` and its tool ``rst2html5``.
-
 You can compile the full distribution, including examples, tests, and proofs by running ``dune build @runtest`` in the top-level directory of this repo.  Generated files are placed in ``_build``.
 
 .. Each directory in ``_objects`` contains `a Makefile <makefile_>`_ to ease further experimentation (including RTL simulation, profiling, trace generation, etc.).
@@ -810,7 +808,6 @@ The following list shows the current state of the repo:
    ``vagrant/``
       - |etc/vagrant/provision.sh|_: Set up a Vagrant VM for |koika| development
 
-   - |etc/configure|_: Generate dune files for examples/ and tests/
 
 ``examples/``
    ``cosimulation.v.etc/``
@@ -1051,8 +1048,8 @@ The following list shows the current state of the repo:
 .. _coq/Types.v: coq/Types.v
 .. |coq/Vect.v| replace:: ``Vect.v``
 .. _coq/Vect.v: coq/Vect.v
-.. |etc/configure| replace:: ``configure``
-.. _etc/configure: etc/configure
+.. |etc/configure.sh| replace:: ``configure.sh``
+.. _etc/configure.sh: etc/configure.sh
 .. |etc/vagrant/provision.sh| replace:: ``provision.sh``
 .. _etc/vagrant/provision.sh: etc/vagrant/provision.sh
 .. |examples/collatz.lv| replace:: ``collatz.lv``
