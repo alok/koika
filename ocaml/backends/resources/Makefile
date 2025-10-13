@@ -223,7 +223,7 @@ $(verilator_driver).out: $(verilator_optdir)/$(verilator_prefix)
 $(verilator_driver).vcd: $(verilator_tracedir)/$(verilator_prefix)
 	time $(verilator_invoke_trace) "$@"
 
-ifeq (, $(shell which xml2stems))
+ifeq (, $(shell command -v xml2stems))
 $(verilator_driver).gtkwave: $(verilator_driver).vcd
 	@echo "Warning: xml2stems not found: not showing rtlbrowse; try installing a more recent version of GTKWave."
 	gtkwave -A --optimize $<

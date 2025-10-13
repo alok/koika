@@ -93,7 +93,7 @@ Definition package :=
                    koika_rules := rules;
                    koika_rule_external := external;
                    koika_scheduler := sched;
-                   koika_module_name := "intfn" |};
+                   koika_module_name := "method_call" |};
 
      ip_sim := {| sp_ext_fn_specs := empty_ext_fn_props;
                  sp_prelude := None |};

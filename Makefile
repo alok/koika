@@ -1,152 +1,92 @@
-################################################
-#            Check makefile version            #
-# (https://github.com/mit-plv/koika/issues/18) #
-################################################
+ROOT := $(shell while [ ! -e dune-project ] && [ "$$PWD" != "/" ]; do cd ..; done; pwd)
+include $(ROOT)/etc/common.mk
 
-ifeq ($(filter output-sync,$(value .FEATURES)),)
-$(info You have Make version $(MAKE_VERSION).)
-$(error Unsupported version of Make. Please use GNU Make >= 4.0)
-endif
-
-####################
-# Global variables #
-####################
-
-OBJ_DIR := _obj
-BUILD_DIR := _build/default
-COQ_BUILD_DIR := ${BUILD_DIR}/coq
-OCAML_BUILD_DIR := ${BUILD_DIR}/ocaml
-
-V ?=
-verbose := $(if $(V),,@)
-
-default: all
-
-#######
-# Coq #
-#######
-
-coq:
-	@printf "\n== Building Coq library ==\n"
+# building coq without subdirectories (i.e. without the big proofs)
+.PHONY: coq
+coq: configure
+	@$(call emph-print,== <{ build(coq) }> ==)
 	dune build @@coq/all
 
-coq-all:
-	@printf "\n== Building Coq library and proofs ==\n"
+# building coq library and proofs (i.e. all subdirectories)
+.PHONY: coq-all
+coq-all: configure
+	@$(call emph-print,== <{ build(coq) }> ==)
 	dune build @coq/all
 
 CHECKED_MODULES ?= OneRuleAtATime CompilerCorrectness/Correctness
-checked_paths := $(patsubst %,$(COQ_BUILD_DIR)/%.vo,$(CHECKED_MODULES))
 
+# TODO: fails
+.PHONY: coq-check
 coq-check: coq-all
-	coqchk --output-context -R $(COQ_BUILD_DIR) Koika $(checked_paths)
-
-.PHONY: coq coq-all coq-check
-
-#########
-# OCaml #
-#########
-
-ocaml:
-	@printf "\n== Building OCaml library and executables ==\n"
-	dune build ocaml/cuttlec.exe @install
+	coqchk --output-context -R $(BUILD_DIR)/coq Koika $(patsubst %,$(BUILD_DIR)/coq/%.vo,$(CHECKED_MODULES))
 
 .PHONY: ocaml
+ocaml: configure
+	$(verbose)$(MAKE) -C ocaml build
 
 ####################
 # Examples & tests #
 ####################
 
-# The setup below generates one Makefile rule per target.  It uses canned rules
-# and eval because patterns like ‘%1/_objects/%2.v/: %1/%2.v’ aren't supported.
-# https://www.gnu.org/software/make/manual/html_node/Canned-Recipes.html
-# https://www.gnu.org/software/make/manual/html_node/Eval-Function.html
-
-target_directory = $(dir $(1))_objects/$(notdir $(1))
-target_directories = $(foreach fname,$(1),$(call target_directory,$(fname)))
-
-define cuttlec_recipe_prelude =
-	@printf "\n-- Compiling %s --\n" "$<"
-endef
-
-# Execute follow-ups if any
-define cuttlec_recipe_coda =
-	$(verbose)if [ -d $<.etc ]; then cp -rf $<.etc/. "$@"; fi
-	$(verbose)if [ -d $(dir $<)etc ]; then cp -rf $(dir $<)etc/. "$@"; fi
-	$(verbose)if [ -f "$@/Makefile" ]; then $(MAKE) -C "$@"; fi
-endef
-
-# Compile a .lv file
-define cuttlec_lv_recipe_body =
-	dune exec -- cuttlec "$<" \
-		-T all -o "$@" $(if $(findstring .1.,$<),--expect-errors 2> "$@stderr")
-endef
-
-# Compile a .v file
-define cuttlec_v_recipe_body =
-	dune build "$@/$(notdir $(<:.v=.ml))"
-	dune exec -- cuttlec "${BUILD_DIR}/$@/$(notdir $(<:.v=.ml))" -T all -o "$@"
-endef
-
-define cuttlec_lv_template =
-$(eval dirpath := $(call target_directory,$(1)))
-$(dirpath) $(dirpath)/: $(1) ocaml | configure
-	$(value cuttlec_recipe_prelude)
-	$(value cuttlec_lv_recipe_body)
-	$(value cuttlec_recipe_coda)
-endef
-
-define cuttlec_v_template =
-$(eval dirpath := $(call target_directory,$(1)))
-$(dirpath) $(dirpath)/: $(1) ocaml | configure
-	$(value cuttlec_recipe_prelude)
-	$(value cuttlec_v_recipe_body)
-	$(value cuttlec_recipe_coda)
-endef
-
-TESTS := $(wildcard tests/*.lv) $(wildcard tests/*.v)
-EXAMPLES := $(wildcard examples/*.lv) $(wildcard examples/*.v) examples/rv/rv32i.v examples/rv/rv32e.v
-
+.PHONY: configure
 configure:
-	etc/configure $(filter %.v,${TESTS} ${EXAMPLES})
+	$(verbose)$(MAKE) -C tests dune.inc
+	$(verbose)$(MAKE) -C examples dune.inc
 
-$(foreach fname,$(filter %.lv, $(EXAMPLES) $(TESTS)),\
-	$(eval $(call cuttlec_lv_template,$(fname))))
-$(foreach fname,$(filter %.v, $(EXAMPLES) $(TESTS)),\
-	$(eval $(call cuttlec_v_template,$(fname))))
+.PHONY: examples
+examples: configure
+	$(verbose)$(MAKE) -C examples all
 
-examples: $(call target_directories,$(EXAMPLES));
-clean-examples:
-	find examples/ -type d \( -name _objects -or -name _build \) -exec rm -rf {} +
-	rm -rf ${BUILD_DIR}/examples
+.PHONY: tests
+tests: configure
+	$(verbose)$(MAKE) -C tests all
 
-tests: $(call target_directories,$(TESTS));
-clean-tests:
-	find tests/ -type d  \( -name _objects -or -name _build \) -exec rm -rf {} +
-	rm -rf ${BUILD_DIR}/tests
-
-.PHONY: configure examples clean-examples tests clean-tests
 
 #################
 # Whole project #
 #################
 
 readme:
-	./etc/readme/update.py README.rst
+	@$(call emph-print,== <{ update(README.rst) }> ==)
+	@if command -v python &> /dev/null; \
+		then python ./etc/readme/update.py README.rst; \
+		else echo "python not available - skipping readme update"; fi
 
 package:
-	etc/package.sh
+	@$(call emph-print,== <{ package() }> ==)
+	$(verbose)etc/package.sh
 
 dune-all: coq ocaml
-	@printf "\n== Completing full build ==\n"
+	@printf "\n== Completing full build =="
 	dune build @all
 
 all: coq ocaml examples tests readme;
 
+clean-%: FORCE %/
+	$(verbose)$(MAKE) -C $* clean
+
 clean: clean-tests clean-examples
+	@$(call emph-print,== <{ clean() }> ==)
 	dune clean
 	rm -f koika-*.tar.gz
 
 .PHONY: readme package dune-all all clean
+
+help-%: FORCE
+	$(verbose)$(MAKE) -C $* help
+
+help::
+	@echo "help-<subdir> - help page for subdir"
+	@echo
+	@echo "all           - build everythin: coq + ocaml + examples + test + .."
+	@echo "coq           - build coq files"
+	@echo "coq-all       - build coq files + proofs"
+	@echo "coq-check     - check axiomatic dependencies of important theorems"
+	@echo "examples      - build all examples"
+	@echo "tests         - build all tests"
+	@echo "clean         - clean build files"
+	@echo "package       - create a .tar.gz-file of the current state"
+	@echo "configure     - create **/dune.inc files"
 
 .SUFFIXES:
 
@@ -154,6 +94,4 @@ clean: clean-tests clean-examples
 # handling most of the parallelism for us
 .NOTPARALLEL:
 
-# Disable built-in rules
-MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:

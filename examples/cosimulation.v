@@ -52,7 +52,7 @@ Module CoSimulation.
 
        ip_sim := {| sp_ext_fn_specs _ := {| efs_name := "blackbox";
                                           efs_method := false |};
-                   sp_prelude := None |};
+                   sp_prelude := Some "#include ""extfuns.hpp""" |};
 
        ip_verilog := {| vp_ext_fn_specs _ := {| efr_name := "blackbox";
                                               efr_internal := true |} |} |}.
