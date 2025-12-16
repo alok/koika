@@ -95,8 +95,7 @@ partial def interpAction
       match interpAction env extEnv schedLog actLog ctx arg with
       | none => none
       | some (log', argVal, ctx') =>
-          -- Apply the primitive operation
-          some (log', sorry, ctx')  -- TODO: implement primitive semantics
+          some (log', Apply.fn1 fn argVal, ctx')
   | .binop fn arg1 arg2 =>
       match interpAction env extEnv schedLog actLog ctx arg1 with
       | none => none
@@ -104,8 +103,7 @@ partial def interpAction
           match interpAction env extEnv schedLog log' ctx' arg2 with
           | none => none
           | some (log'', arg2Val, ctx'') =>
-              -- Apply the primitive operation
-              some (log'', sorry, ctx'')  -- TODO: implement primitive semantics
+              some (log'', Apply.fn2 fn arg1Val arg2Val, ctx'')
   | .extCall fn arg =>
       match interpAction env extEnv schedLog actLog ctx arg with
       | none => none

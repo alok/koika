@@ -410,4 +410,115 @@ def interp2 (fn : Typed.FBits2)
 
 end Sem
 
+/-! ## Typed Primitive Application
+
+Functions to apply typed primitives to typed values.
+-/
+
+namespace Apply
+
+/-- Type of a field lookup result -/
+def fieldResultTy (fields : List (String × Ty)) (idx : Nat) : Ty :=
+  match fields[idx]? with
+  | some (_, ty) => ty
+  | none => unitTy
+
+/-- Get the nth field from a struct value -/
+def getField : (fields : List (String × Ty)) → (idx : Nat) →
+    fieldsDenote fields → (fieldResultTy fields idx).denote
+  | [], _, _ => (0 : BitVec 0)  -- unitTy.denote = BitVec 0
+  | (_, _) :: _, 0, (v, _) => v
+  | _ :: rest, n + 1, (_, vs) => getField rest n vs
+
+/-- Set the nth field in a struct value -/
+def setField : (fields : List (String × Ty)) → (idx : Nat) →
+    fieldsDenote fields → (fieldResultTy fields idx).denote → fieldsDenote fields
+  | [], _, vals, _ => vals
+  | (_, _) :: _, 0, (_, vs), newVal => (newVal, vs)
+  | (_, ty) :: rest, n + 1, (v, vs), newVal => (v, setField rest n vs newVal)
+
+/-- Pack a value into bits (for pack conversion) -/
+def packValue : (tau : Ty) → tau.denote → BitVec tau.size
+  | .bits sz, bs => bs
+  | .enum sig, bs => bs
+  | .struct _ fields, vals => packFields fields vals
+  | .array elemType len, f => packArray elemType len f
+where
+  packFields : (fields : List (String × Ty)) → fieldsDenote fields → BitVec (fieldsSize fields)
+    | [], () => 0
+    | (_, ty) :: rest, (v, vs) =>
+        let fieldBits := packValue ty v
+        let restBits := packFields rest vs
+        -- Concatenate: field bits are MSB, rest are LSB
+        BitVec.ofNat (ty.size + fieldsSize rest) (fieldBits.toNat * (2 ^ fieldsSize rest) + restBits.toNat)
+  packArray : (elemType : Ty) → (len : Nat) → (Fin len → elemType.denote) → BitVec (len * elemType.size)
+    | _, 0, _ => 0
+    | elemType, len + 1, f =>
+        let lastElem := packValue elemType (f ⟨len, Nat.lt_succ_self len⟩)
+        let restElems := packArray elemType len (fun i => f ⟨i.val, Nat.lt_succ_of_lt i.isLt⟩)
+        -- Last element is MSB
+        BitVec.ofNat ((len + 1) * elemType.size)
+          (lastElem.toNat * (2 ^ (len * elemType.size)) + restElems.toNat)
+
+/-- Unpack bits into a value (for unpack conversion) -/
+def unpackValue : (tau : Ty) → BitVec tau.size → tau.denote
+  | .bits sz, bs => bs
+  | .enum sig, bs => bs
+  | .struct _ fields, bs => unpackFields fields bs
+  | .array elemType len, bs => unpackArray elemType len bs
+where
+  unpackFields : (fields : List (String × Ty)) → BitVec (fieldsSize fields) → fieldsDenote fields
+    | [], _ => ()
+    | (_, ty) :: rest, bs =>
+        -- Extract MSB portion for field, LSB portion for rest
+        let fieldBits : BitVec ty.size := bs.extractLsb' (fieldsSize rest) ty.size
+        let restBits : BitVec (fieldsSize rest) := bs.extractLsb' 0 (fieldsSize rest)
+        (unpackValue ty fieldBits, unpackFields rest restBits)
+  unpackArray : (elemType : Ty) → (len : Nat) → BitVec (len * elemType.size) → (Fin len → elemType.denote)
+    | _, 0, _ => fun i => i.elim0
+    | elemType, len + 1, bs => fun i =>
+        if h : i.val = len then
+          -- Last element (MSB)
+          let elemBits : BitVec elemType.size := bs.extractLsb' (len * elemType.size) elemType.size
+          unpackValue elemType elemBits
+        else
+          -- Earlier element
+          let restBits : BitVec (len * elemType.size) := bs.extractLsb' 0 (len * elemType.size)
+          unpackArray elemType len restBits ⟨i.val, Nat.lt_of_le_of_ne (Nat.lt_succ_iff.mp i.isLt) h⟩
+
+/-- Apply a typed unary function to a typed value -/
+def fn1 (f : Typed.Fn1) (arg : (Sig.arg1 f).denote) : (Sig.ret1 f).denote :=
+  match f with
+  | .display _ => (0 : BitVec 0)  -- Display returns unit
+  | .conv tau .pack => packValue tau arg
+  | .conv tau .unpack => unpackValue tau arg
+  | .conv _ .ignore => (0 : BitVec 0)  -- Ignore returns unit
+  | .bits1 fn => Sem.interp1 fn arg
+  | .struct1 .getField _ fields idx => getField fields idx arg
+  | .array1 .getElement elemType len idx =>
+      if h : idx < len then arg ⟨idx, h⟩ else Ty.default elemType
+
+/-- Apply a typed binary function to typed values -/
+def fn2 (f : Typed.Fn2) (arg1 : (Sig.args2 f).1.denote) (arg2 : (Sig.args2 f).2.denote)
+    : (Sig.ret2 f).denote :=
+  match f with
+  | .eq tau false =>
+      -- Equality: pack both and compare
+      let bits1 := packValue tau arg1
+      let bits2 := packValue tau arg2
+      if bits1 == bits2 then (1 : BitVec 1) else (0 : BitVec 1)
+  | .eq tau true =>
+      -- Inequality
+      let bits1 := packValue tau arg1
+      let bits2 := packValue tau arg2
+      if bits1 == bits2 then (0 : BitVec 1) else (1 : BitVec 1)
+  | .bits2 fn => Sem.interp2 fn arg1 arg2
+  | .struct2 .substField _ fields idx => setField fields idx arg1 arg2
+  | .array2 .substElement elemType len idx =>
+      if h : idx < len then
+        fun i => if i.val = idx then arg2 else arg1 i
+      else arg1
+
+end Apply
+
 end Koika
