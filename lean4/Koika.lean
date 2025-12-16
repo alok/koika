@@ -11,6 +11,7 @@ import Koika.Semantics.Logs
 import Koika.Semantics.Interp
 import Koika.Compile.Lowered
 import Koika.Compile.Circuit
+import Koika.Compile.CircuitSemantics
 import Koika.Compile.Lower
 import Koika.Compile.Optimize
 import Koika.Backend.Verilog
