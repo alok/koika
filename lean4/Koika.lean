@@ -10,6 +10,7 @@ import Koika.DSL.Syntax
 import Koika.Semantics.Logs
 import Koika.Semantics.Interp
 import Koika.Compile.Lowered
+import Koika.Compile.LoweredFunctions
 import Koika.Compile.Circuit
 import Koika.Compile.CircuitSemantics
 import Koika.Compile.Lower
