@@ -115,7 +115,9 @@ def executeOneCycle
   let circuits := compileSchedulerWithRules R Sigma rules s
   interpSchedulerCircuits R Sigma circuits regEnv extEnv
 
-end Compiler
+end Compiler -- end section
+
+end Compiler -- end namespace
 
 /-! ## Legacy Notation Compatibility
 
