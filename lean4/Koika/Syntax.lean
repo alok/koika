@@ -100,6 +100,16 @@ mutual
     | sugar (s : USugar pos_t var_t fn_name_t reg_t ext_fn_t)
 end
 
+/-! ## Inhabited Instances -/
+
+instance {pos_t var_t fn_name_t reg_t ext_fn_t : Type} [Inhabited pos_t] [Inhabited var_t] [Inhabited fn_name_t] :
+    Inhabited (USugar pos_t var_t fn_name_t reg_t ext_fn_t) where
+  default := .skip
+
+instance {pos_t var_t fn_name_t reg_t ext_fn_t : Type} [Inhabited pos_t] [Inhabited var_t] [Inhabited fn_name_t] :
+    Inhabited (UAction pos_t var_t fn_name_t reg_t ext_fn_t) where
+  default := .fail unitTy
+
 /-! ## Scheduler -/
 
 /-- Scheduler for ordering rule execution -/

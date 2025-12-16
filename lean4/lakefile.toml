@@ -5,6 +5,12 @@ defaultTargets = ["koika"]
 # Dependencies - add mathlib later if needed for proofs
 # For now, use Lean's built-in BitVec
 
+# VersoCoq for {coq} role in documentation linking to original Coq sources
+[[require]]
+name = "VersoCoq"
+git = "https://github.com/alok/VersoCoq"
+rev = "main"
+
 [[lean_lib]]
 name = "Koika"
 globs = ["Koika", "Koika.DSL", "Koika.Semantics", "Koika.Compile", "Koika.Backend", "Koika.Proofs"]
