@@ -99,7 +99,7 @@ private theorem isTrue_eq_false_iff (b : BitVec 1) : isTrue b = false ↔ b = 0 
   unfold isTrue
   constructor
   · intro h
-    simp only [bne_iff_ne, ne_eq, Bool.not_eq_true'] at h
+    simp only [ne_eq] at h
     have hlt := b.isLt
     have htoNat : b.toNat = 0 := by
       cases hb : b.toNat with
@@ -116,7 +116,7 @@ private theorem isTrue_eq_true_iff (b : BitVec 1) : isTrue b = true ↔ b = 1 :=
   · intro h
     have hlt := b.isLt
     have hne0 : b.toNat ≠ 0 := by
-      simp only [bne_iff_ne, ne_eq, ← decide_not] at h
+      simp only [ne_eq] at h
       exact of_decide_eq_true h
     have hlt' : b.toNat < 2 := by simp at hlt; exact hlt
     have htoNat : b.toNat = 1 := by omega
@@ -350,7 +350,7 @@ theorem circuitLe_not
     circuitLe regEnv extEnv
       (.unop (.not 1) c2) (.unop (.not 1) c1) := by
   unfold circuitLe at *
-  simp only [interpCircuit, Circuit.evalFBits1, BitVec.cast_eq]
+  simp only [interpCircuit, Circuit.evalFBits1]
   rw [isTrue_not, isTrue_not]
   exact boolLe_not _ _ h
 
