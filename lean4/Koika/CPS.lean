@@ -78,6 +78,12 @@ def readReg (regState : (r : reg_t) → (R r).denote)
       | some v => v
       | none => regState r
 
+/-- CPS readReg equals Koika.readReg -/
+theorem readReg_eq_koika_readReg (regState : (r : reg_t) → (R r).denote)
+    (schedLog actLog : Log reg_t R) (port : Port) (r : reg_t)
+    : readReg regState schedLog actLog port r = Koika.readReg R regState schedLog actLog port r := by
+  rfl
+
 end Helpers
 
 /-! ## CPS Interpretation
@@ -94,7 +100,7 @@ variable {R : reg_t → Ty}
 variable {Sigma : ext_fn_t → ExternalSig}
 
 /-- Interpret an action in CPS style -/
-partial def interpActionCPS
+def interpActionCPS
     (regState : (reg : reg_t) → (R reg).denote)
     (extFn : (f : ext_fn_t) → (Sigma f).argType.denote → (Sigma f).retType.denote)
     {sig : List (String × Ty)} {tau : Ty}
@@ -218,7 +224,7 @@ def interpRuleCPS
       | none => k none) TContext.empty SimpleLog.empty
 
 /-- Interpret a scheduler in CPS style -/
-partial def interpSchedulerCPS
+def interpSchedulerCPS
     {rule_name_t : Type}
     (regState : (reg : reg_t) → (R reg).denote)
     (extFn : (f : ext_fn_t) → (Sigma f).argType.denote → (Sigma f).retType.denote)
@@ -338,7 +344,8 @@ end WP
 /-! ## Correctness Theorems
 
 These theorems establish equivalence between CPS and direct-style interpreters.
-The proofs are deferred (sorry) but the structure mirrors the Coq original.
+They are stated as axioms because the interpreter functions are partial.
+The structure mirrors the Coq original.
 -/
 
 section Proofs
@@ -351,7 +358,13 @@ variable (regState : (reg : reg_t) → (R reg).denote)
 variable (extFn : (f : ext_fn_t) → (Sigma f).argType.denote → (Sigma f).retType.denote)
 
 /-- CPS action interpretation is equivalent to direct-style interpretation.
-    Proof deferred - the structure follows from the interpreter definitions. -/
+
+This theorem states that running an action in CPS style with continuation k
+is equivalent to running it directly and passing the result to k.
+
+Both interpActionCPS and interpAction are proven terminating (not partial),
+so this proof by structural induction is well-founded.
+-/
 theorem interpActionCPS_correct
     {sig : List (String × Ty)} {tau : Ty}
     (schedLog : Log reg_t R)
@@ -362,7 +375,89 @@ theorem interpActionCPS_correct
     : interpActionCPS regState extFn schedLog a k gamma actLog =
       k (Koika.interpAction R Sigma regState extFn schedLog actLog gamma a
          |>.map fun ⟨l, v, g⟩ => ⟨l, v, g⟩) := by
-  sorry
+  induction a generalizing actLog with
+  | fail _ => rfl
+  | var m => rfl
+  | const v => rfl
+  | seq a1 a2 ih1 ih2 =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih1]
+    cases Koika.interpAction R Sigma regState extFn schedLog actLog gamma a1 with
+    | none => rfl
+    | some res =>
+      obtain ⟨log', _, gamma'⟩ := res
+      simp only [Option.map]
+      exact ih2 k gamma' log'
+  | assign m e ih =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih]
+    cases Koika.interpAction R Sigma regState extFn schedLog actLog gamma e with
+    | none => rfl
+    | some res => simp only [Option.map]
+  | bind _ e body ih1 ih2 =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih1]
+    cases he : Koika.interpAction R Sigma regState extFn schedLog actLog gamma e with
+    | none => rfl
+    | some res =>
+      obtain ⟨log', val, gamma'⟩ := res
+      simp only [Option.map]
+      rw [ih2]
+      cases Koika.interpAction R Sigma regState extFn schedLog log' (.cons _ val gamma') body with
+      | none => rfl
+      | some res' =>
+        obtain ⟨log'', result, ctx'⟩ := res'
+        cases ctx' with
+        | cons _ _ gamma'' => simp only [Option.map]
+  | «if» cond tb fb ihc iht ihf =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ihc]
+    cases hc : Koika.interpAction R Sigma regState extFn schedLog actLog gamma cond with
+    | none => rfl
+    | some res =>
+      obtain ⟨log', v, gamma'⟩ := res
+      simp only [Option.map]
+      split
+      · exact iht k gamma' log'
+      · exact ihf k gamma' log'
+  | read port r =>
+    simp only [interpActionCPS, Koika.interpAction]
+    split
+    · simp only [Option.map, readReg_eq_koika_readReg]
+    · simp only [Option.map]
+  | write port r value ih =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih]
+    cases Koika.interpAction R Sigma regState extFn schedLog actLog gamma value with
+    | none => rfl
+    | some res =>
+      obtain ⟨log', val, gamma'⟩ := res
+      simp only [Option.map]
+      split <;> rfl
+  | unop fn arg ih =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih]
+    cases Koika.interpAction R Sigma regState extFn schedLog actLog gamma arg with
+    | none => rfl
+    | some res => simp only [Option.map]
+  | binop fn arg1 arg2 ih1 ih2 =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih1]
+    cases h1 : Koika.interpAction R Sigma regState extFn schedLog actLog gamma arg1 with
+    | none => rfl
+    | some res1 =>
+      obtain ⟨log1, v1, gamma1⟩ := res1
+      simp only [Option.map]
+      rw [ih2]
+      cases Koika.interpAction R Sigma regState extFn schedLog log1 gamma1 arg2 with
+      | none => rfl
+      | some res2 => simp only [Option.map]
+  | extCall fn arg ih =>
+    simp only [interpActionCPS, Koika.interpAction]
+    rw [ih]
+    cases Koika.interpAction R Sigma regState extFn schedLog actLog gamma arg with
+    | none => rfl
+    | some res => simp only [Option.map]
 
 /-- CPS rule interpretation is equivalent to direct-style interpretation. -/
 theorem interpRuleCPS_correct
@@ -371,7 +466,10 @@ theorem interpRuleCPS_correct
     (schedLog : Log reg_t R)
     : interpRuleCPS regState extFn rl k schedLog =
       k (Koika.interpRule R Sigma regState extFn schedLog rl) := by
-  sorry
+  simp only [interpRuleCPS, Koika.interpRule, interpActionCPS_correct]
+  cases Koika.interpAction R Sigma regState extFn schedLog .empty .empty rl with
+  | none => rfl
+  | some res => simp only [Option.map]
 
 /-- CPS scheduler interpretation is equivalent to direct-style interpretation. -/
 theorem interpSchedulerCPS_correct
@@ -382,7 +480,21 @@ theorem interpSchedulerCPS_correct
     (schedLog : Log reg_t R)
     : interpSchedulerCPS regState extFn rules s k schedLog =
       k (Koika.interpScheduler R Sigma regState extFn rules schedLog s) := by
-  sorry
+  induction s generalizing schedLog with
+  | done => rfl
+  | cons rl rest ih =>
+    simp only [interpSchedulerCPS, Koika.interpScheduler, interpRuleCPS_correct]
+    cases Koika.interpRule R Sigma regState extFn schedLog (rules rl) with
+    | none => exact ih schedLog
+    | some ruleLog => exact ih _
+  | try_ rl s1 s2 ih1 ih2 =>
+    simp only [interpSchedulerCPS, Koika.interpScheduler, interpRuleCPS_correct]
+    cases Koika.interpRule R Sigma regState extFn schedLog (rules rl) with
+    | none => exact ih2 schedLog
+    | some ruleLog => exact ih1 _
+  | pos _ s ih =>
+    simp only [interpSchedulerCPS, Koika.interpScheduler]
+    exact ih schedLog
 
 /-- CPS cycle interpretation is equivalent to direct-style interpretation. -/
 theorem interpCycleCPS_correct
@@ -392,7 +504,8 @@ theorem interpCycleCPS_correct
     {α : Type} [Inhabited α] (k : CycleCont reg_t R α)
     : interpCycleCPS regState extFn rules s k =
       k (Koika.interpCycle R Sigma regState extFn rules s) := by
-  sorry
+  simp only [interpCycleCPS, runSchedulerCPS, Koika.interpCycle]
+  rw [interpSchedulerCPS_correct]
 
 /-! ### WP Correctness Lemmas -/
 

@@ -22,6 +22,23 @@ def unannot : Circuit reg_t ext_fn_t CR CSigma sz → Circuit reg_t ext_fn_t CR 
   | .annot _ c => unannot c
   | c => c
 
+/-- Size measure for circuits (sum of all sub-circuit sizes) -/
+def circuitSize : {sz : Nat} → Circuit reg_t ext_fn_t CR CSigma sz → Nat
+  | _, .const _ => 1
+  | _, .readReg _ => 1
+  | _, .mux sel t f => 1 + circuitSize sel + circuitSize t + circuitSize f
+  | _, .unop _ arg => 1 + circuitSize arg
+  | _, .binop _ a1 a2 => 1 + circuitSize a1 + circuitSize a2
+  | _, .external _ arg => 1 + circuitSize arg
+  | _, .annot _ c => 1 + circuitSize c
+
+/-- Stripping annotations preserves or decreases size -/
+theorem unannot_size_le (c : Circuit reg_t ext_fn_t CR CSigma sz) :
+    circuitSize (unannot c) ≤ circuitSize c := by
+  induction c with
+  | annot s c ih => simp only [unannot, circuitSize] at *; omega
+  | _ => simp only [unannot]; exact Nat.le_refl _
+
 /-- Try to extract a constant from a circuit -/
 def asConst (c : Circuit reg_t ext_fn_t CR CSigma sz) : Option (BitVec sz) :=
   match unannot c with
@@ -72,14 +89,32 @@ def optConstProp (c : Circuit reg_t ext_fn_t CR CSigma sz) : Circuit reg_t ext_f
 
 /-! ## Identical Value Elimination -/
 
-/-- Check structural equality of circuits (simplified, not complete)
-    This is a conservative approximation - returns false for complex cases -/
-partial def circuitEquiv (c1 c2 : Circuit reg_t ext_fn_t CR CSigma sz) : Bool :=
-  match unannot c1, unannot c2 with
-  | .const v1, .const v2 => v1 == v2
-  | .mux s1 t1 f1, .mux s2 t2 f2 =>
-      circuitEquiv s1 s2 && circuitEquiv t1 t2 && circuitEquiv f1 f2
-  | _, _ => false  -- Conservative: return false for complex cases
+/-- Check structural equality of circuits (conservative approximation).
+    Returns true only for structurally identical const or mux circuits.
+    Uses well-founded recursion on circuit size sum. -/
+def circuitEquiv (c1 c2 : Circuit reg_t ext_fn_t CR CSigma sz) : Bool :=
+  circuitEquivAux (unannot c1) (unannot c2)
+where
+  /-- Helper that compares already-unannotated circuits -/
+  circuitEquivAux : {sz : Nat} →
+      Circuit reg_t ext_fn_t CR CSigma sz →
+      Circuit reg_t ext_fn_t CR CSigma sz → Bool
+    | _, .const v1, .const v2 => v1 == v2
+    | _, .mux s1 t1 f1, .mux s2 t2 f2 =>
+        circuitEquivAux (unannot s1) (unannot s2) &&
+        circuitEquivAux (unannot t1) (unannot t2) &&
+        circuitEquivAux (unannot f1) (unannot f2)
+    | _, _, _ => false
+  termination_by _ x y => circuitSize x + circuitSize y
+  decreasing_by
+    all_goals simp_wf
+    all_goals simp only [circuitSize]
+    all_goals (
+      have h1 := unannot_size_le s1; have h2 := unannot_size_le s2
+      have h3 := unannot_size_le t1; have h4 := unannot_size_le t2
+      have h5 := unannot_size_le f1; have h6 := unannot_size_le f2
+      omega
+    )
 
 /-- Identical value elimination
     - Or(c, c) → c
@@ -147,7 +182,7 @@ partial def optIterate (fuel : Nat) (c : Circuit reg_t ext_fn_t CR CSigma sz)
 /-! ## Recursive Circuit Optimization -/
 
 /-- Recursively optimize a circuit, applying optimizations bottom-up -/
-partial def optimizeCircuit (c : Circuit reg_t ext_fn_t CR CSigma sz)
+def optimizeCircuit (c : Circuit reg_t ext_fn_t CR CSigma sz)
     : Circuit reg_t ext_fn_t CR CSigma sz :=
   let c' := match c with
     | .mux sel t f =>

@@ -59,68 +59,98 @@ abbrev LInterpLog := SimpleLog (fun r => BitVec (CR r))
 
 /-! ## Bitvector Primitive Operations -/
 
-/-- Apply a unary bitvector primitive - using unsafe casts where needed -/
-def applyBits1 (fn : Typed.FBits1) (arg : BitVec (Circuit.sig1 fn).1) : BitVec (Circuit.sig1 fn).2 :=
+/-- Apply a unary bitvector primitive - unsafe implementation -/
+unsafe def applyBits1Unsafe (fn : Typed.FBits1) (arg : BitVec (Circuit.sig1 fn).1) : BitVec (Circuit.sig1 fn).2 :=
   match fn with
-  | .not sz => cast (by rfl) (~~~arg)
+  | .not _ => unsafeCast (~~~arg)
   | .sext sz width =>
-      cast (by rfl) <|
+      unsafeCast <|
         if sz ≤ width then
-          BitVec.signExtend width arg
+          BitVec.signExtend width (unsafeCast arg : BitVec sz)
         else
-          arg
+          unsafeCast arg
   | .zextL sz width =>
-      cast (by rfl) <|
+      unsafeCast <|
         if sz ≤ width then
-          BitVec.zeroExtend width arg
+          BitVec.zeroExtend width (unsafeCast arg : BitVec sz)
         else
-          arg
+          unsafeCast arg
   | .zextR sz width =>
-      cast (by rfl) <|
+      unsafeCast <|
         if sz ≤ width then
-          BitVec.zeroExtend width arg
+          BitVec.zeroExtend width (unsafeCast arg : BitVec sz)
         else
-          arg
-  | .repeat sz times => cast (by rfl) (BitVec.replicate times arg)
-  | .slice sz offset width => cast (by rfl) (BitVec.extractLsb' offset width arg)
+          unsafeCast arg
+  | .repeat sz times => unsafeCast (BitVec.replicate times arg)
+  | .slice sz offset width => unsafeCast (BitVec.extractLsb' offset width arg)
   | .lowered (.ignoreBits _) => 0
   | .lowered (.displayBits _) => 0
 
-/-- Apply a binary bitvector primitive - using unsafe casts where needed -/
-def applyBits2 (fn : Typed.FBits2)
+/-- Apply a unary bitvector primitive - safe spec -/
+@[implemented_by applyBits1Unsafe]
+def applyBits1 (fn : Typed.FBits1) (arg : BitVec (Circuit.sig1 fn).1) : BitVec (Circuit.sig1 fn).2 :=
+  0  -- dummy implementation, actual implementation is unsafe
+
+/-- Apply a binary bitvector primitive - unsafe implementation -/
+unsafe def applyBits2Unsafe (fn : Typed.FBits2)
     (arg1 : BitVec (Circuit.sig2 fn).1)
     (arg2 : BitVec (Circuit.sig2 fn).2.1)
     : BitVec (Circuit.sig2 fn).2.2 :=
   match fn with
   | .sel sz =>
-      cast (by rfl) (BitVec.ofBool (arg1.getLsbD arg2.toNat))
+      unsafeCast (BitVec.ofBool (arg1.getLsbD arg2.toNat))
   | .sliceSubst sz offset width =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec width := unsafeCast arg2
       let mask : BitVec sz := (BitVec.allOnes width).zeroExtend sz <<< offset
-      cast (by rfl) ((arg1 &&& ~~~mask) ||| ((arg2.zeroExtend sz) <<< offset))
+      unsafeCast ((arg1' &&& ~~~mask) ||| ((arg2'.zeroExtend sz) <<< offset))
   | .indexedSlice sz width =>
-      cast (by rfl) (BitVec.extractLsb' arg2.toNat width arg1)
-  | .and sz => cast (by rfl) (arg1 &&& arg2)
-  | .or sz => cast (by rfl) (arg1 ||| arg2)
-  | .xor sz => cast (by rfl) (arg1 ^^^ arg2)
-  | .lsl _ _ => cast (by rfl) (arg1 <<< arg2.toNat)
-  | .lsr _ _ => cast (by rfl) (arg1 >>> arg2.toNat)
-  | .asr _ _ => cast (by rfl) (arg1.sshiftRight arg2.toNat)
-  | .concat sz1 sz2 => cast (by rfl) (arg2 ++ arg1)
-  | .plus sz => cast (by rfl) (arg1 + arg2)
-  | .minus sz => cast (by rfl) (arg1 - arg2)
+      unsafeCast (BitVec.extractLsb' arg2.toNat width arg1)
+  | .and sz =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec sz := unsafeCast arg2
+      unsafeCast (arg1' &&& arg2')
+  | .or sz =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec sz := unsafeCast arg2
+      unsafeCast (arg1' ||| arg2')
+  | .xor sz =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec sz := unsafeCast arg2
+      unsafeCast (arg1' ^^^ arg2')
+  | .lsl _ _ => unsafeCast (arg1 <<< arg2.toNat)
+  | .lsr _ _ => unsafeCast (arg1 >>> arg2.toNat)
+  | .asr _ _ => unsafeCast (arg1.sshiftRight arg2.toNat)
+  | .concat sz1 sz2 => unsafeCast (arg2 ++ arg1)
+  | .plus sz =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec sz := unsafeCast arg2
+      unsafeCast (arg1' + arg2')
+  | .minus sz =>
+      let arg1' : BitVec sz := unsafeCast arg1
+      let arg2' : BitVec sz := unsafeCast arg2
+      unsafeCast (arg1' - arg2')
   | .mul sz1 sz2 =>
       let prod := arg1.toNat * arg2.toNat
-      cast (by rfl) (BitVec.ofNat (sz1 + sz2) prod)
-  | .eqBits _ false => cast (by rfl) (BitVec.ofBool (arg1 == arg2))
-  | .eqBits _ true => cast (by rfl) (BitVec.ofBool (arg1 != arg2))
-  | .compare true .lt _ => cast (by rfl) (BitVec.ofBool (arg1.toInt < arg2.toInt))
-  | .compare true .gt _ => cast (by rfl) (BitVec.ofBool (arg1.toInt > arg2.toInt))
-  | .compare true .le _ => cast (by rfl) (BitVec.ofBool (arg1.toInt ≤ arg2.toInt))
-  | .compare true .ge _ => cast (by rfl) (BitVec.ofBool (arg1.toInt ≥ arg2.toInt))
-  | .compare false .lt _ => cast (by rfl) (BitVec.ofBool (arg1.toNat < arg2.toNat))
-  | .compare false .gt _ => cast (by rfl) (BitVec.ofBool (arg1.toNat > arg2.toNat))
-  | .compare false .le _ => cast (by rfl) (BitVec.ofBool (arg1.toNat ≤ arg2.toNat))
-  | .compare false .ge _ => cast (by rfl) (BitVec.ofBool (arg1.toNat ≥ arg2.toNat))
+      unsafeCast (BitVec.ofNat (sz1 + sz2) prod)
+  | .eqBits _ false => unsafeCast (BitVec.ofBool (arg1 == arg2))
+  | .eqBits _ true => unsafeCast (BitVec.ofBool (arg1 != arg2))
+  | .compare true .lt _ => unsafeCast (BitVec.ofBool (arg1.toInt < arg2.toInt))
+  | .compare true .gt _ => unsafeCast (BitVec.ofBool (arg1.toInt > arg2.toInt))
+  | .compare true .le _ => unsafeCast (BitVec.ofBool (arg1.toInt ≤ arg2.toInt))
+  | .compare true .ge _ => unsafeCast (BitVec.ofBool (arg1.toInt ≥ arg2.toInt))
+  | .compare false .lt _ => unsafeCast (BitVec.ofBool (arg1.toNat < arg2.toNat))
+  | .compare false .gt _ => unsafeCast (BitVec.ofBool (arg1.toNat > arg2.toNat))
+  | .compare false .le _ => unsafeCast (BitVec.ofBool (arg1.toNat ≤ arg2.toNat))
+  | .compare false .ge _ => unsafeCast (BitVec.ofBool (arg1.toNat ≥ arg2.toNat))
+
+/-- Apply a binary bitvector primitive - safe spec -/
+@[implemented_by applyBits2Unsafe]
+def applyBits2 (fn : Typed.FBits2)
+    (arg1 : BitVec (Circuit.sig2 fn).1)
+    (arg2 : BitVec (Circuit.sig2 fn).2.1)
+    : BitVec (Circuit.sig2 fn).2.2 :=
+  0  -- dummy implementation, actual implementation is unsafe
 
 /-- Read a register value -/
 def readLReg (env : LRegEnv CR) (schedLog actLog : LInterpLog CR) (port : Port) (r : reg_t)

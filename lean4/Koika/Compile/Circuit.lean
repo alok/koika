@@ -93,17 +93,89 @@ end Circuit
 
 namespace Circuit
 
-/-- Evaluate a unary circuit primitive on a bitvector
-    Note: Implementation uses sorry for complex cases; fill in as needed -/
+/-- Evaluate a unary circuit primitive on a bitvector -/
 def evalFBits1 (fn : Typed.FBits1) (v : BitVec (Koika.Circuit.sig1 fn).1)
-    : BitVec (Koika.Circuit.sig1 fn).2 := sorry
+    : BitVec (Koika.Circuit.sig1 fn).2 :=
+  match fn with
+  | .not sz => ~~~v
+  | .sext sz width => v.signExtend (max sz width)
+  | .zextL sz width => v.zeroExtend (max sz width)
+  | .zextR sz width => (v.zeroExtend (max sz width)) <<< (max sz width - sz)
+  | .repeat sz times => (BitVec.replicate times v).cast (Nat.mul_comm sz times)
+  | .slice _sz offset width => v.extractLsb' offset width
+  | .lowered (.ignoreBits _sz) => 0
+  | .lowered (.displayBits _) => 0
 
-/-- Evaluate a binary circuit primitive on bitvectors
-    Note: Implementation uses sorry for complex cases; fill in as needed -/
-def evalFBits2 (fn : Typed.FBits2)
-    (v1 : BitVec (Koika.Circuit.sig2 fn).1)
-    (v2 : BitVec (Koika.Circuit.sig2 fn).2.1)
-    : BitVec (Koika.Circuit.sig2 fn).2.2 := sorry
+/-- Evaluate a binary circuit primitive on bitvectors -/
+def evalFBits2 : (fn : Typed.FBits2) →
+    (v1 : BitVec (Koika.Circuit.sig2 fn).1) →
+    (v2 : BitVec (Koika.Circuit.sig2 fn).2.1) →
+    BitVec (Koika.Circuit.sig2 fn).2.2
+  | .and sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      (v1' &&& v2').cast rfl
+  | .or sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      (v1' ||| v2').cast rfl
+  | .xor sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      (v1' ^^^ v2').cast rfl
+  | .lsl bitsSz shiftSz, v1, v2 =>
+      let v1' : BitVec bitsSz := v1.cast rfl
+      (v1' <<< v2.toNat).cast rfl
+  | .lsr bitsSz shiftSz, v1, v2 =>
+      let v1' : BitVec bitsSz := v1.cast rfl
+      (v1' >>> v2.toNat).cast rfl
+  | .asr bitsSz shiftSz, v1, v2 =>
+      let v1' : BitVec bitsSz := v1.cast rfl
+      (v1'.sshiftRight v2.toNat).cast rfl
+  | .concat sz1 sz2, v1, v2 =>
+      let v1' : BitVec sz1 := v1.cast rfl
+      let v2' : BitVec sz2 := v2.cast rfl
+      -- Append produces sz1 + sz2, but sig2 expects sz2 + sz1
+      (v1' ++ v2').cast (Nat.add_comm sz1 sz2)
+  | .sel sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      BitVec.ofBool (v1'.getLsbD v2.toNat)
+  | .sliceSubst sz offset width, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec width := v2.cast rfl
+      let mask : BitVec sz := (BitVec.allOnes width).zeroExtend sz <<< offset
+      let clearedV1 := v1' &&& ~~~mask
+      let shiftedV2 := (v2'.zeroExtend sz) <<< offset
+      (clearedV1 ||| shiftedV2).cast rfl
+  | .indexedSlice sz width, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      (v1'.extractLsb' v2.toNat width).cast rfl
+  | .plus sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      (v1' + v2').cast rfl
+  | .minus sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      (v1' - v2').cast rfl
+  | .mul sz1 sz2, v1, v2 =>
+      let v1' : BitVec sz1 := v1.cast rfl
+      let v2' : BitVec sz2 := v2.cast rfl
+      (v1'.zeroExtend (sz1 + sz2) * v2'.zeroExtend (sz1 + sz2)).cast rfl
+  | .eqBits sz negate, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      let eq := v1' == v2'
+      BitVec.ofBool (if negate then !eq else eq)
+  | .compare signed cmp sz, v1, v2 =>
+      let v1' : BitVec sz := v1.cast rfl
+      let v2' : BitVec sz := v2.cast rfl
+      let result := match cmp with
+        | .lt => if signed then BitVec.slt v1' v2' else v1' < v2'
+        | .le => if signed then BitVec.sle v1' v2' else v1' ≤ v2'
+        | .gt => if signed then BitVec.slt v2' v1' else v2' < v1'
+        | .ge => if signed then BitVec.sle v2' v1' else v2' ≤ v1'
+      BitVec.ofBool result
 
 end Circuit
 
@@ -246,12 +318,19 @@ structure CompileResult (reg_t ext_fn_t : Type)
   rwc : RWCircuit reg_t ext_fn_t CR CSigma
   ctx : CContext reg_t ext_fn_t CR CSigma sig
 
+/-- Default CContext for any signature -/
+def CContext.default {reg_t ext_fn_t : Type}
+    {CR : reg_t → Nat} {CSigma : ext_fn_t → CExternalSig}
+    : (sig : LSig) → CContext reg_t ext_fn_t CR CSigma sig
+  | [] => .empty
+  | sz :: rest => .cons (.const 0) (CContext.default rest)
+
 instance {reg_t ext_fn_t : Type} {CR : reg_t → Nat} {CSigma : ext_fn_t → CExternalSig}
     {sig : LSig} {sz : Nat}
     : Nonempty (CompileResult reg_t ext_fn_t CR CSigma sig sz) :=
   ⟨{ retVal := .const 0
      rwc := RWCircuit.init
-     ctx := sorry }⟩  -- ctx needs to match sig
+     ctx := CContext.default sig }⟩
 
 namespace CompileAction
 

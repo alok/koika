@@ -164,11 +164,11 @@ namespace Scheduler
 def ofList (rules : List rule_name_t) : Scheduler pos_t rule_name_t :=
   rules.foldr (fun r s => .cons r s) .done
 
-/-- Convert scheduler to list of rules (for sequential schedulers) -/
-partial def toList : Scheduler pos_t rule_name_t → List rule_name_t
+/-- Convert scheduler to list of all rules (includes both branches of try_) -/
+def toList : Scheduler pos_t rule_name_t → List rule_name_t
   | .done => []
   | .cons r s => r :: toList s
-  | .try_ r s1 _ => r :: toList s1  -- simplified
+  | .try_ r s1 s2 => r :: toList s1 ++ toList s2
   | .pos _ s => toList s
 
 end Scheduler

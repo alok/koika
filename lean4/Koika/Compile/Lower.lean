@@ -33,6 +33,29 @@ def lowerExternalSig (sig : ExternalSig) : CExternalSig :=
 def structTotalSize (fields : List (String × Ty)) : Nat :=
   fields.foldl (fun acc (_, ty) => acc + ty.size) 0
 
+/-- Helper: foldl with addition distributes over initial value -/
+theorem foldl_add_init : ∀ (fields : List (String × Ty)) (init : Nat),
+    fields.foldl (fun acc (_, ty) => acc + ty.size) init =
+    init + fields.foldl (fun acc (_, ty) => acc + ty.size) 0
+  | [], init => by simp
+  | hd :: tl, init => by
+    simp only [List.foldl, Nat.zero_add]
+    rw [foldl_add_init tl (init + hd.2.size)]
+    rw [foldl_add_init tl hd.2.size]
+    omega
+
+/-- structTotalSize equals fieldsSize -/
+@[grind] theorem structTotalSize_eq_fieldsSize : ∀ (fields : List (String × Ty)),
+    structTotalSize fields = fieldsSize fields
+  | [] => rfl
+  | hd :: tl => by
+    unfold structTotalSize fieldsSize
+    simp only [List.foldl, Nat.zero_add]
+    rw [foldl_add_init]
+    have ih := structTotalSize_eq_fieldsSize tl
+    unfold structTotalSize at ih
+    rw [ih]
+
 /-- Compute offset to a field in a struct -/
 def fieldOffset (fields : List (String × Ty)) (idx : Nat) : Nat :=
   fields.drop (idx + 1) |>.foldl (fun acc (_, ty) => acc + ty.size) 0
@@ -92,35 +115,82 @@ def lowerSigma (f : ext_fn_t) : CExternalSig := lowerExternalSig (Sigma f)
 
 /-! ## Size Equality Lemmas -/
 
+/-- Helper: fieldWidth matches type size -/
+theorem fieldWidth_eq_type_size (fields : List (String × Ty)) (idx : Nat) :
+    (match fields[idx]? with | some (_, ty) => ty | none => unitTy).size =
+    match fields[idx]? with | some (_, ty) => ty.size | none => 0 := by
+  cases h : fields[idx]? with
+  | none => rfl
+  | some p => rfl
+
 /-- The argument size after lowering matches the circuit signature -/
-theorem arg1_size_eq (fn : Typed.Fn1) :
+@[grind] theorem arg1_size_eq (fn : Typed.Fn1) :
     (Sig.arg1 fn).size = (Circuit.sig1 (lowerFn1 fn)).1 := by
-  cases fn <;> simp [Sig.arg1, lowerFn1, Circuit.sig1] <;> try rfl
-  all_goals sorry  -- These require proving structTotalSize = Ty.size for struct
+  cases fn with
+  | display fn => cases fn <;> rfl
+  | conv tau cn => cases cn <;> rfl
+  | bits1 fn => cases fn <;> rfl
+  | struct1 op name fields idx =>
+    cases op
+    simp only [Sig.arg1, lowerFn1, Circuit.sig1, Ty.size, structTotalSize_eq_fieldsSize]
+  | array1 op elemTy len idx =>
+    cases op
+    simp only [Sig.arg1, lowerFn1, Circuit.sig1, Ty.size, Nat.mul_comm]
 
 /-- The return size after lowering matches the circuit signature -/
-theorem ret1_size_eq (fn : Typed.Fn1) :
+@[grind] theorem ret1_size_eq (fn : Typed.Fn1) :
     (Sig.ret1 fn).size = (Circuit.sig1 (lowerFn1 fn)).2 := by
-  cases fn <;> simp [Sig.ret1, lowerFn1, Circuit.sig1] <;> try rfl
-  all_goals sorry
+  cases fn with
+  | display fn => cases fn <;> rfl
+  | conv tau cn => cases cn <;> rfl
+  | bits1 fn => cases fn <;> rfl
+  | struct1 op name fields idx =>
+    cases op
+    simp only [Sig.ret1, lowerFn1, Circuit.sig1]
+    exact fieldWidth_eq_type_size fields idx
+  | array1 op elemTy len idx =>
+    cases op
+    rfl
 
 /-- The first argument size after lowering matches the circuit signature -/
-theorem args2_1_size_eq (fn : Typed.Fn2) :
+@[grind] theorem args2_1_size_eq (fn : Typed.Fn2) :
     (Sig.args2 fn).1.size = (Circuit.sig2 (lowerFn2 fn)).1 := by
-  cases fn <;> simp [Sig.args2, lowerFn2, Circuit.sig2] <;> try rfl
-  all_goals sorry
+  cases fn with
+  | eq tau neg => rfl
+  | bits2 fn => cases fn <;> rfl
+  | struct2 op name fields idx =>
+    cases op
+    simp only [Sig.args2, lowerFn2, Circuit.sig2, Ty.size, structTotalSize_eq_fieldsSize]
+  | array2 op elemTy len idx =>
+    cases op
+    simp only [Sig.args2, lowerFn2, Circuit.sig2, Ty.size]
 
 /-- The second argument size after lowering matches the circuit signature -/
-theorem args2_2_size_eq (fn : Typed.Fn2) :
+@[grind] theorem args2_2_size_eq (fn : Typed.Fn2) :
     (Sig.args2 fn).2.size = (Circuit.sig2 (lowerFn2 fn)).2.1 := by
-  cases fn <;> simp [Sig.args2, lowerFn2, Circuit.sig2] <;> try rfl
-  all_goals sorry
+  cases fn with
+  | eq tau neg => rfl
+  | bits2 fn => cases fn <;> rfl
+  | struct2 op name fields idx =>
+    cases op
+    simp only [Sig.args2, lowerFn2, Circuit.sig2]
+    exact fieldWidth_eq_type_size fields idx
+  | array2 op elemTy len idx =>
+    cases op
+    rfl
 
 /-- The return size after lowering matches the circuit signature -/
-theorem ret2_size_eq (fn : Typed.Fn2) :
+@[grind] theorem ret2_size_eq (fn : Typed.Fn2) :
     (Sig.ret2 fn).size = (Circuit.sig2 (lowerFn2 fn)).2.2 := by
-  cases fn <;> simp [Sig.ret2, lowerFn2, Circuit.sig2] <;> try rfl
-  all_goals sorry
+  cases fn with
+  | eq tau neg => rfl
+  | bits2 fn => cases fn <;> rfl
+  | struct2 op name fields idx =>
+    cases op
+    simp only [Sig.ret2, lowerFn2, Circuit.sig2, Ty.size, structTotalSize_eq_fieldsSize]
+  | array2 op elemTy len idx =>
+    cases op
+    simp only [Sig.ret2, lowerFn2, Circuit.sig2, Ty.size]
 
 /-- Cast an LAction to a different size (when sizes are proven equal) -/
 def castLAction (h : sz = sz') :

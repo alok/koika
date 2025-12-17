@@ -39,7 +39,7 @@ def readReg (env : RegEnv R) (schedLog actLog : InterpLog R) (port : Port) (r : 
       | none => env r
 
 /-- Interpret a typed action -/
-partial def interpAction
+def interpAction
     (env : RegEnv R)
     (extEnv : ExtEnv Sigma)
     (schedLog : InterpLog R)
@@ -132,7 +132,7 @@ variable (R : reg_t → Ty)
 variable (Sigma : ext_fn_t → ExternalSig)
 
 /-- Interpret a scheduler -/
-partial def interpScheduler
+def interpScheduler
     (env : RegEnv R)
     (extEnv : ExtEnv Sigma)
     (rules : rule_name_t → Rule reg_t ext_fn_t R Sigma)

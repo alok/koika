@@ -22,7 +22,15 @@ structure EnumSig where
   size : Nat  -- number of members
   bitsize : Nat  -- bit width for encoding
   members : Array String  -- member names (length = size)
-  deriving Repr, BEq, DecidableEq
+  deriving Repr, DecidableEq
+
+/-- BEq for EnumSig via DecidableEq (ensures LawfulBEq) -/
+instance : BEq EnumSig where
+  beq a b := decide (a = b)
+
+instance : LawfulBEq EnumSig where
+  eq_of_beq h := of_decide_eq_true h
+  rfl := decide_eq_true rfl
 
 /-! ## Kôika Types -/
 
@@ -55,8 +63,67 @@ end
 
 instance : BEq Ty := ⟨Ty.beq⟩
 
+/-! ## Ty.beq soundness and completeness -/
+
+mutual
+  theorem Ty.beq_eq_true_iff : ∀ t1 t2 : Ty, t1.beq t2 = true ↔ t1 = t2
+    | .bits sz1, .bits sz2 => by simp [Ty.beq, beq_iff_eq]
+    | .bits _, .enum _ => by simp [Ty.beq]
+    | .bits _, .struct _ _ => by simp [Ty.beq]
+    | .bits _, .array _ _ => by simp [Ty.beq]
+    | .enum _, .bits _ => by simp [Ty.beq]
+    | .enum sig1, .enum sig2 => by
+        simp only [Ty.beq, beq_iff_eq]
+        exact Iff.intro (congrArg Ty.enum) (fun h => Ty.enum.inj h)
+    | .enum _, .struct _ _ => by simp [Ty.beq]
+    | .enum _, .array _ _ => by simp [Ty.beq]
+    | .struct _ _, .bits _ => by simp [Ty.beq]
+    | .struct _ _, .enum _ => by simp [Ty.beq]
+    | .struct n1 f1, .struct n2 f2 => by
+        simp only [Ty.beq, Bool.and_eq_true, beq_iff_eq]
+        constructor
+        · intro ⟨hn, hf⟩
+          have hfeq := (fieldsBeq_eq_true_iff f1 f2).mp hf
+          simp [hn, hfeq]
+        · intro h
+          injection h with hn hf
+          exact ⟨hn, (fieldsBeq_eq_true_iff f1 f2).mpr hf⟩
+    | .struct _ _, .array _ _ => by simp [Ty.beq]
+    | .array _ _, .bits _ => by simp [Ty.beq]
+    | .array _ _, .enum _ => by simp [Ty.beq]
+    | .array _ _, .struct _ _ => by simp [Ty.beq]
+    | .array t1 l1, .array t2 l2 => by
+        simp only [Ty.beq, Bool.and_eq_true, beq_iff_eq]
+        constructor
+        · intro ⟨ht, hl⟩
+          have hteq := (Ty.beq_eq_true_iff t1 t2).mp ht
+          simp [hteq, hl]
+        · intro h
+          injection h with ht hl
+          exact ⟨(Ty.beq_eq_true_iff t1 t2).mpr ht, hl⟩
+
+  theorem fieldsBeq_eq_true_iff : ∀ f1 f2 : List (String × Ty), fieldsBeq f1 f2 = true ↔ f1 = f2
+    | [], [] => by simp [fieldsBeq]
+    | [], _ :: _ => by simp [fieldsBeq]
+    | _ :: _, [] => by simp [fieldsBeq]
+    | (n1, t1) :: rest1, (n2, t2) :: rest2 => by
+        simp only [fieldsBeq, Bool.and_eq_true, beq_iff_eq]
+        constructor
+        · intro ⟨⟨hn, ht⟩, hr⟩
+          have hteq := (Ty.beq_eq_true_iff t1 t2).mp ht
+          have hreq := (fieldsBeq_eq_true_iff rest1 rest2).mp hr
+          simp [hn, hteq, hreq]
+        · intro h
+          injection h with h1 h2
+          have ⟨hn, ht⟩ := Prod.mk.inj h1
+          exact ⟨⟨hn, (Ty.beq_eq_true_iff t1 t2).mpr ht⟩, (fieldsBeq_eq_true_iff rest1 rest2).mpr h2⟩
+end
+
 instance : DecidableEq Ty := fun t1 t2 =>
-  if t1.beq t2 then isTrue (by sorry) else isFalse (by sorry)
+  if h : t1.beq t2 then
+    isTrue ((Ty.beq_eq_true_iff t1 t2).mp h)
+  else
+    isFalse (fun heq => h ((Ty.beq_eq_true_iff t1 t2).mpr heq))
 
 /-! ## Repr for Ty -/
 
@@ -208,7 +275,60 @@ def Ty.id : Ty → String
 
 /-! ## DecidableEq for denote -/
 
--- DecidableEq for denote is complex; defer for now
-instance (ty : Ty) : DecidableEq ty.denote := fun _ _ => sorry
+/-- Helper: check all elements of finite function for equality -/
+def finFunEqDec {n : Nat} {α : Type} [DecidableEq α] (f g : Fin n → α) : Decidable (f = g) := by
+  induction n with
+  | zero => exact isTrue (funext (fun i => i.elim0))
+  | succ n ih =>
+    -- Check the last element and recurse
+    let f' : Fin n → α := fun i => f ⟨i.val, Nat.lt_trans i.isLt (Nat.lt_succ_self n)⟩
+    let g' : Fin n → α := fun i => g ⟨i.val, Nat.lt_trans i.isLt (Nat.lt_succ_self n)⟩
+    match ih f' g' with
+    | isFalse hne =>
+        apply isFalse
+        intro heq
+        apply hne
+        funext i
+        have := congrFun heq ⟨i.val, Nat.lt_trans i.isLt (Nat.lt_succ_self n)⟩
+        exact this
+    | isTrue heq =>
+        let last : Fin (n + 1) := ⟨n, Nat.lt_succ_self n⟩
+        if hlast : f last = g last then
+          apply isTrue
+          funext i
+          if hi : i.val < n then
+            have := congrFun heq ⟨i.val, hi⟩
+            exact this
+          else
+            have := Nat.eq_of_lt_succ_of_not_lt i.isLt hi
+            have : i = last := Fin.ext this
+            rw [this]
+            exact hlast
+        else
+          apply isFalse
+          intro heq'
+          apply hlast
+          exact congrFun heq' last
+
+mutual
+  /-- DecidableEq for Ty.denote -/
+  def Ty.decEq : (ty : Ty) → DecidableEq ty.denote
+    | .bits sz => fun (a : BitVec sz) (b : BitVec sz) => decEq a b
+    | .enum sig => fun (a : BitVec sig.bitsize) (b : BitVec sig.bitsize) => decEq a b
+    | .struct _ fields => fieldsDecEq fields
+    | .array elemType len => fun f g =>
+        @finFunEqDec len elemType.denote (Ty.decEq elemType) f g
+
+  def fieldsDecEq : (fields : List (String × Ty)) → DecidableEq (fieldsDenote fields)
+    | [] => fun _ _ => isTrue rfl  -- Unit has one element
+    | (_, ty) :: rest =>
+        fun (a1, r1) (a2, r2) =>
+          match Ty.decEq ty a1 a2, fieldsDecEq rest r1 r2 with
+          | isTrue ha, isTrue hr => isTrue (by rw [ha, hr])
+          | isFalse ha, _ => isFalse (fun h => ha (Prod.mk.inj h).1)
+          | _, isFalse hr => isFalse (fun h => hr (Prod.mk.inj h).2)
+end
+
+instance (ty : Ty) : DecidableEq ty.denote := Ty.decEq ty
 
 end Koika
