@@ -11,6 +11,11 @@ name = "VersoCoq"
 git = "https://github.com/alok/VersoCoq"
 rev = "main"
 
+[[require]]
+name = "canonical"
+git = "https://github.com/chasenorman/CanonicalLean"
+rev = "master"
+
 [[lean_lib]]
 name = "Koika"
 globs = ["Koika", "Koika.DSL", "Koika.Semantics", "Koika.Compile", "Koika.Backend", "Koika.Proofs"]
