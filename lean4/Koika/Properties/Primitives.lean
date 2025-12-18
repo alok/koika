@@ -164,7 +164,7 @@ section Arithmetic
   intro h
   rw [BitVec.toNat_signExtend]
   rw [BitVec.zeroExtend_eq_setWidth.symm, to_N_zextend n m v h]
-  cases hmsb : v.msb <;> simp [hmsb]
+  cases v.msb <;> rfl
 
 end Arithmetic
 

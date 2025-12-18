@@ -96,14 +96,14 @@ def map {K' : Type} {V' : K' → Type}
   | _ :: _, cons k v ctx => cons (fK k) (fV k v) (map fK fV ctx)
 
 /-- Left fold over context -/
-def foldl {T : Type} (f : ∀ (k : K) (v : V k) (acc : T), T) :
+def foldl {T : Type} (f : ∀ (k : K) (_v : V k) (_acc : T), T) :
     {sig : List K} → Context (V := V) sig → T → T
   | [], empty, init => init
   | _ :: _, cons k v ctx, init => foldl f ctx (f k v init)
 
 /-- Right fold over context -/
 def foldr {T : List K → Type}
-    (f : ∀ (sg : List K) (k : K) (v : V k), T sg → T (k :: sg)) :
+    (f : ∀ (sg : List K) (k : K) (_v : V k), T sg → T (k :: sg)) :
     {sig : List K} → Context (V := V) sig → T [] → T sig
   | [], empty, init => init
   | _ :: _, cons k v ctx, init => f _ k v (foldr f ctx init)
@@ -268,7 +268,7 @@ theorem Context.create_funext' {K : Type} {V : K → Type} {sig : List K}
 /-- Creating a context from assoc lookups of an existing context gives back the same context -/
 theorem Context.create_assoc_id {K : Type} {V : K → Type} {sig : List K}
     (ctx : Context (V := V) sig) :
-    Context.create sig (fun k m => Context.assoc m ctx) = ctx := by
+    Context.create sig (fun _k m => Context.assoc m ctx) = ctx := by
   induction ctx with
   | empty => rfl
   | @cons k sig' v ctx' ih =>

@@ -135,7 +135,7 @@ theorem fieldWidth_eq_type_size (fields : List (String × Ty)) (idx : Nat) :
     simp only [Sig.arg1, lowerFn1, Circuit.sig1, Ty.size, structTotalSize_eq_fieldsSize]
   | array1 op elemTy len idx =>
     cases op
-    simp only [Sig.arg1, lowerFn1, Circuit.sig1, Ty.size, Nat.mul_comm]
+    simp only [Sig.arg1, lowerFn1, Circuit.sig1, Ty.size]
 
 /-- The return size after lowering matches the circuit signature -/
 @[grind] theorem ret1_size_eq (fn : Typed.Fn1) :

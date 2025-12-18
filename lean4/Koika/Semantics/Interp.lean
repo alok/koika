@@ -61,7 +61,7 @@ def interpAction
       | none => none
       | some (log', _, ctx') =>
           interpAction env extEnv schedLog log' ctx' b
-  | .bind v e body =>
+  | .bind _v e body =>
       match interpAction env extEnv schedLog actLog ctx e with
       | none => none
       | some (log', val, ctx') =>

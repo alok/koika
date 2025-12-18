@@ -281,7 +281,7 @@ namespace Sem
 /-- Select a single bit from bitvector by index -/
 def sel (bs : BitVec sz) (idx : BitVec idxSz) : BitVec 1 :=
   let i := idx.toNat
-  if h : i < sz then
+  if _h : i < sz then
     BitVec.ofBool (bs.getLsbD i)
   else
     0
@@ -353,7 +353,7 @@ def compare (signed : Bool) (cmp : Comparison) (bs1 bs2 : BitVec sz) : BitVec 1 
 /-- Interpret typed unary bitvector operation -/
 def interp1 (fn : Typed.FBits1) : BitVec (Circuit.sig1 fn).1 → BitVec (Circuit.sig1 fn).2 :=
   match fn with
-  | .not sz => fun bs => ~~~bs
+  | .not _sz => fun bs => ~~~bs
   | .sext sz width => fun bs =>
       -- Sign extend preserving sign
       BitVec.signExtend (max sz width) bs
@@ -367,7 +367,7 @@ def interp1 (fn : Typed.FBits1) : BitVec (Circuit.sig1 fn).1 → BitVec (Circuit
       let result := (List.replicate times bs.toNat).foldl
         (fun acc v => acc * (2 ^ sz) + v) 0
       BitVec.ofNat (times * sz) result
-  | .slice sz offset width => fun bs =>
+  | .slice _sz offset width => fun bs =>
       bs.extractLsb' offset width
   | .lowered (.ignoreBits _) => fun _ => 0
   | .lowered (.displayBits _) => fun _ => 0
@@ -376,14 +376,14 @@ def interp1 (fn : Typed.FBits1) : BitVec (Circuit.sig1 fn).1 → BitVec (Circuit
 def interp2 (fn : Typed.FBits2)
     : BitVec (Circuit.sig2 fn).1 → BitVec (Circuit.sig2 fn).2.1 → BitVec (Circuit.sig2 fn).2.2 :=
   match fn with
-  | .sel sz => fun bs idx => sel bs idx
+  | .sel _sz => fun bs idx => sel bs idx
   | .sliceSubst sz offset width => fun bs v =>
       -- Replace slice at offset with v
       let mask : Nat := ((1 <<< width) - 1) <<< offset
       let cleared := bs.toNat &&& (Nat.xor mask (2^sz - 1))
       let inserted := (v.toNat &&& ((1 <<< width) - 1)) <<< offset
       BitVec.ofNat sz (cleared ||| inserted)
-  | .indexedSlice sz width => fun bs offset =>
+  | .indexedSlice _sz width => fun bs offset =>
       bs.extractLsb' offset.toNat width
   | .and sz => fun a b =>
       BitVec.ofNat sz (a.toNat &&& b.toNat)
@@ -391,9 +391,9 @@ def interp2 (fn : Typed.FBits2)
       BitVec.ofNat sz (a.toNat ||| b.toNat)
   | .xor sz => fun a b =>
       BitVec.ofNat sz (Nat.xor a.toNat b.toNat)
-  | .lsl bitsSz _ => fun bs places => lsl bs places
-  | .lsr bitsSz _ => fun bs places => lsr bs places
-  | .asr bitsSz _ => fun bs places => asr bs places
+  | .lsl _bitsSz _ => fun bs places => lsl bs places
+  | .lsr _bitsSz _ => fun bs places => lsr bs places
+  | .asr _bitsSz _ => fun bs places => asr bs places
   | .concat sz1 sz2 => fun a b =>
       -- a is MSB, b is LSB
       let result := a.toNat * (2 ^ sz2) + b.toNat
@@ -404,9 +404,9 @@ def interp2 (fn : Typed.FBits2)
       BitVec.ofNat sz (a.toNat - b.toNat)
   | .mul sz1 sz2 => fun a b =>
       BitVec.ofNat (sz1 + sz2) (a.toNat * b.toNat)
-  | .eqBits sz false => fun a b => beqBits a b
-  | .eqBits sz true => fun a b => bneBits a b
-  | .compare signed cmp sz => fun a b => compare signed cmp a b
+  | .eqBits _sz false => fun a b => beqBits a b
+  | .eqBits _sz true => fun a b => bneBits a b
+  | .compare signed cmp _sz => fun a b => compare signed cmp a b
 
 end Sem
 
@@ -435,12 +435,12 @@ def setField : (fields : List (String × Ty)) → (idx : Nat) →
     fieldsDenote fields → (fieldResultTy fields idx).denote → fieldsDenote fields
   | [], _, vals, _ => vals
   | (_, _) :: _, 0, (_, vs), newVal => (newVal, vs)
-  | (_, ty) :: rest, n + 1, (v, vs), newVal => (v, setField rest n vs newVal)
+  | (_, _ty) :: rest, n + 1, (v, vs), newVal => (v, setField rest n vs newVal)
 
 /-- Pack a value into bits (for pack conversion) -/
 def packValue : (tau : Ty) → tau.denote → BitVec tau.size
-  | .bits sz, bs => bs
-  | .enum sig, bs => bs
+  | .bits _sz, bs => bs
+  | .enum _sig, bs => bs
   | .struct _ fields, vals => packFields fields vals
   | .array elemType len, f => packArray elemType len f
 where
@@ -462,8 +462,8 @@ where
 
 /-- Unpack bits into a value (for unpack conversion) -/
 def unpackValue : (tau : Ty) → BitVec tau.size → tau.denote
-  | .bits sz, bs => bs
-  | .enum sig, bs => bs
+  | .bits _sz, bs => bs
+  | .enum _sig, bs => bs
   | .struct _ fields, bs => unpackFields fields bs
   | .array elemType len, bs => unpackArray elemType len bs
 where
@@ -514,8 +514,8 @@ def fn2 (f : Typed.Fn2) (arg1 : (Sig.args2 f).1.denote) (arg2 : (Sig.args2 f).2.
       if bits1 == bits2 then (0 : BitVec 1) else (1 : BitVec 1)
   | .bits2 fn => Sem.interp2 fn arg1 arg2
   | .struct2 .substField _ fields idx => setField fields idx arg1 arg2
-  | .array2 .substElement elemType len idx =>
-      if h : idx < len then
+  | .array2 .substElement _elemType len idx =>
+      if _h : idx < len then
         fun i => if i.val = idx then arg2 else arg1 i
       else arg1
 

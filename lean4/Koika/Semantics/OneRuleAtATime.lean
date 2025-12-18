@@ -404,20 +404,16 @@ theorem interp_scheduler_trace_correct_aux
   | cons r rest ih =>
     simp only [interpSchedulerTrace, interpScheduler]
     cases hr : interpRule R Sigma env extEnv schedLog (rules r) with
-    | some ruleLog =>
-      simp only [hr]
+    | some _ruleLog =>
       exact ih _
     | none =>
-      simp only [hr]
       exact ih _
   | try_ r s1 s2 ih1 ih2 =>
     simp only [interpSchedulerTrace, interpScheduler]
     cases hr : interpRule R Sigma env extEnv schedLog (rules r) with
-    | some ruleLog =>
-      simp only [hr]
+    | some _ruleLog =>
       exact ih1 _
     | none =>
-      simp only [hr]
       exact ih2 _
   | pos _ s ih =>
     simp only [interpSchedulerTrace, interpScheduler]
@@ -470,14 +466,11 @@ theorem one_rule_at_a_time_aux (env : RegEnv R) (extEnv : ExtEnv Sigma)
     cases hr : interpRule R Sigma env extEnv schedLog (rules ruleName) with
     | some ruleLog =>
       -- Rule succeeded: trace = ruleName :: trace_rest, finalLog from recursive call
-      simp only [hr]
       -- Apply IH with newSchedLog = ruleLog.append schedLog
       have ih' := ih (ruleLog.append schedLog)
-      simp only at ih'
       -- Need to show: foldRules ... (commitUpdate env schedLog) (ruleName :: trace_rest)
       --             = foldRules ... (commitUpdate env (ruleLog.append schedLog)) trace_rest
       rw [foldRules_cons]
-      simp only
       -- By interpRule_commit: interpRule (commitUpdate env schedLog) .empty rule = some ruleLog
       have hcommit := interpRule_commit R Sigma env extEnv .empty schedLog (rules ruleName) ruleLog
       rw [log_app_empty_l] at hcommit
@@ -489,17 +482,13 @@ theorem one_rule_at_a_time_aux (env : RegEnv R) (extEnv : ExtEnv Sigma)
       exact ih'
     | none =>
       -- Rule failed: continue with rest, schedLog unchanged
-      simp only [hr]
       exact ih schedLog
   | try_ ruleName s1 s2 ih1 ih2 =>
     simp only [interpSchedulerTrace]
     cases hr : interpRule R Sigma env extEnv schedLog (rules ruleName) with
     | some ruleLog =>
-      simp only [hr]
       have ih' := ih1 (ruleLog.append schedLog)
-      simp only at ih'
       rw [foldRules_cons]
-      simp only
       have hcommit := interpRule_commit R Sigma env extEnv .empty schedLog (rules ruleName) ruleLog
       rw [log_app_empty_l] at hcommit
       have hr' := hcommit hr
@@ -507,7 +496,6 @@ theorem one_rule_at_a_time_aux (env : RegEnv R) (extEnv : ExtEnv Sigma)
       rw [commit_update_assoc]
       exact ih'
     | none =>
-      simp only [hr]
       exact ih2 schedLog
   | pos _ s ih =>
     simp only [interpSchedulerTrace]

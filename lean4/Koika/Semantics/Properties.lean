@@ -32,7 +32,7 @@ theorem list_find_opt_app {A : Type} (f : A → Bool) (l1 l2 : List A) :
 
 section LogProperties
 
-variable {reg_t : Type} [DecidableEq reg_t]
+variable {reg_t : Type}
 variable {V : reg_t → Type}
 
 /-- Log append is associative -/
@@ -59,7 +59,7 @@ end LogProperties
 
 section LogPredicates
 
-variable {reg_t : Type} [DecidableEq reg_t]
+variable {reg_t : Type}
 variable {V : reg_t → Type}
 
 /-- Forall over appended logs is conjunction of foralls -/
@@ -102,7 +102,8 @@ variable {V : reg_t → Type}
   cases l1.existsb idx isWrite1 <;> cases l2.existsb idx isWrite1 <;> simp
 
 /-- Helper: existsb distributes over append -/
-@[grind] theorem existsb_append (l1 l2 : SimpleLog V) (idx : reg_t) (f : LogEntryKind → Port → Bool) :
+@[grind] theorem existsb_append {reg_t : Type} {V : reg_t → Type}
+    (l1 l2 : SimpleLog V) (idx : reg_t) (f : LogEntryKind → Port → Bool) :
     (l1.append l2).existsb idx f = (l1.existsb idx f || l2.existsb idx f) := by
   unfold SimpleLog.append SimpleLog.existsb
   simp only [List.any_append]
@@ -153,8 +154,8 @@ variable {V : reg_t → Type}
   -- Otherwise, the if-condition is false
   split
   case isTrue h =>
-    simp only [Bool.and_eq_true, beq_iff_eq] at h
-    simp only [Bool.and_eq_true, beq_iff_eq] at hentry
+    simp only [Bool.and_eq_true] at h
+    simp only [Bool.and_eq_true] at hentry
     exact absurd h hentry
   case isFalse => rfl
 
@@ -412,13 +413,12 @@ theorem readReg_p1_commit (env : RegEnv R) (schedLog actLog : InterpLog R) (r : 
   -- hmay : schedLog.existsb r isWrite1 = false
   -- This means schedLog.latestWrite r = schedLog.latestWrite0 r
   cases ha : actLog.latestWrite0 r with
-  | some v =>
+  | some _v =>
     -- Both sides return v
-    simp only [Option.or, ha, Option.getD_some]
+    rfl
   | none =>
     -- LHS = schedLog.latestWrite0 r or env r
     -- RHS = commitUpdate env schedLog r
-    simp only [Option.or, ha, Option.getD_none]
     unfold commitUpdate
     have heq : schedLog.latestWrite r = schedLog.latestWrite0 r := by
       apply latestWrite_eq_latestWrite0_of_no_write1
@@ -485,7 +485,7 @@ theorem latestWrite_sl'_none_of_mayRead_p0 (sl sl' : InterpLog R) (r : reg_t) :
     simp only [hbeq, Bool.false_eq_true, ↓reduceIte]
 
 /-- Helper: if mayRead (sl.append sl') P1 r, then sl' has no write1 entries -/
-theorem latestWrite1_sl'_none_of_mayRead_p1 (sl sl' : InterpLog R) (r : reg_t) :
+theorem latestWrite1_sl'_none_of_mayRead_p1 (R : reg_t → Ty) (sl sl' : InterpLog R) (r : reg_t) :
     (sl.append sl').mayRead .p1 r = true →
     sl'.existsb r isWrite1 = false := by
   intro hmay
@@ -535,13 +535,12 @@ theorem readReg_commit_general (env : RegEnv R) (sl sl' actLog : InterpLog R) (p
     rw [heq]
     -- Now both sides are: (actLog.append sl).latestWrite0 r .or sl'.latestWrite0 r .getD env r
     cases h1 : (actLog.append sl).latestWrite0 r with
-    | some v =>
-      simp only [Option.or, h1, Option.getD_some]
+    | some _v =>
+      rfl
     | none =>
-      simp only [Option.or, h1, Option.getD_none]
       cases h2 : sl'.latestWrite0 r with
-      | some v => simp only [Option.getD_some]
-      | none => simp only [Option.getD_none]
+      | some _v => rfl
+      | none => rfl
 
 end ReadRegCommitGeneral
 
@@ -549,7 +548,7 @@ end ReadRegCommitGeneral
 
 section MayReadWriteCommit
 
-variable {reg_t : Type} [DecidableEq reg_t]
+variable {reg_t : Type}
 variable {V : reg_t → Type}
 
 /-- mayRead with empty schedLog is always true for both ports -/
@@ -558,7 +557,7 @@ variable {V : reg_t → Type}
   cases port <;> simp [SimpleLog.mayRead, SimpleLog.existsb, SimpleLog.empty]
 
 /-- If schedLog.mayRead port r, then empty.mayRead port r (trivially true) -/
-theorem mayRead_commit_impl (schedLog : SimpleLog V) (port : Port) (r : reg_t) :
+theorem mayRead_commit_impl [DecidableEq reg_t] (schedLog : SimpleLog V) (port : Port) (r : reg_t) :
     schedLog.mayRead port r = true →
     (SimpleLog.empty (R := V)).mayRead port r = true := by
   intro _

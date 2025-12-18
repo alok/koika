@@ -280,8 +280,8 @@ def generateSchedulerVerilog
     : String := Id.run do
   -- Build register info
   let mut regInfos : List RegInfo := []
-  let mut writeEnables : List (reg_t × String) := []
-  let mut writeDatas : List (reg_t × String) := []
+  let mut _writeEnables : List (reg_t × String) := []
+  let mut _writeDatas : List (reg_t × String) := []
 
   -- For now, create placeholder write enable/data
   -- In a full implementation, we'd generate circuits for each register

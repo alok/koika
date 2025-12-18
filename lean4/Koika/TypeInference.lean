@@ -91,9 +91,9 @@ def tc1 (fn : Untyped.Fn1) (tau1 : Ty) : Except String Typed.Fn1 := do
           match findField fields f with
           | some idx => return .struct1 .getField name fields idx
           | none => throw s!"field {f} not found in struct {name}"
-      | .getFieldBits structName fields f =>
+      | .getFieldBits _structName fields f =>
           match findField fields f with
-          | some idx => return .bits1 (.lowered (.ignoreBits 0))  -- TODO: proper impl
+          | some _idx => return .bits1 (.lowered (.ignoreBits 0))  -- TODO: proper impl
           | none => throw s!"field {f} not found"
   | .array1 fn =>
       match fn with
@@ -103,7 +103,7 @@ def tc1 (fn : Untyped.Fn1) (tau1 : Ty) : Except String Typed.Fn1 := do
             return .array1 .getElement elemTy len pos
           else
             throw s!"array index {pos} out of bounds (len={len})"
-      | .getElementBits elemTy len pos =>
+      | .getElementBits _elemTy len pos =>
           if pos < len then
             return .bits1 (.lowered (.ignoreBits 0))  -- TODO: proper impl
           else

@@ -97,7 +97,7 @@ namespace Circuit
 def evalFBits1 (fn : Typed.FBits1) (v : BitVec (Koika.Circuit.sig1 fn).1)
     : BitVec (Koika.Circuit.sig1 fn).2 :=
   match fn with
-  | .not sz => ~~~v
+  | .not _sz => ~~~v
   | .sext sz width => v.signExtend (max sz width)
   | .zextL sz width => v.zeroExtend (max sz width)
   | .zextR sz width => (v.zeroExtend (max sz width)) <<< (max sz width - sz)
@@ -123,13 +123,13 @@ def evalFBits2 : (fn : Typed.FBits2) →
       let v1' : BitVec sz := v1.cast rfl
       let v2' : BitVec sz := v2.cast rfl
       (v1' ^^^ v2').cast rfl
-  | .lsl bitsSz shiftSz, v1, v2 =>
+  | .lsl bitsSz _shiftSz, v1, v2 =>
       let v1' : BitVec bitsSz := v1.cast rfl
       (v1' <<< v2.toNat).cast rfl
-  | .lsr bitsSz shiftSz, v1, v2 =>
+  | .lsr bitsSz _shiftSz, v1, v2 =>
       let v1' : BitVec bitsSz := v1.cast rfl
       (v1' >>> v2.toNat).cast rfl
-  | .asr bitsSz shiftSz, v1, v2 =>
+  | .asr bitsSz _shiftSz, v1, v2 =>
       let v1' : BitVec bitsSz := v1.cast rfl
       (v1'.sshiftRight v2.toNat).cast rfl
   | .concat sz1 sz2, v1, v2 =>
@@ -323,7 +323,7 @@ def CContext.default {reg_t ext_fn_t : Type}
     {CR : reg_t → Nat} {CSigma : ext_fn_t → CExternalSig}
     : (sig : LSig) → CContext reg_t ext_fn_t CR CSigma sig
   | [] => .empty
-  | sz :: rest => .cons (.const 0) (CContext.default rest)
+  | _sz :: rest => .cons (.const 0) (CContext.default rest)
 
 instance {reg_t ext_fn_t : Type} {CR : reg_t → Nat} {CSigma : ext_fn_t → CExternalSig}
     {sig : LSig} {sz : Nat}
