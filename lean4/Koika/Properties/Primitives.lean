@@ -229,4 +229,72 @@ section Comparisons
 
 end Comparisons
 
+/-! ## Pack/Unpack Roundtrip Properties
+
+These are the key properties showing that `packValue` and `unpackValue` are inverses.
+Port of `value_of_bits_of_value` and `bits_of_value_of_bits` from coq/Types.v.
+
+Note: The full proofs are complex due to the bitwise encoding of structs/arrays.
+The struct and array cases require careful induction on field lists and array lengths.
+For now, we provide the theorem statements with sorry placeholders for these cases,
+as the proofs require extensive bitvector arithmetic.
+-/
+
+section PackUnpack
+
+open Apply
+
+/-- Roundtrip: unpackValue ∘ packValue = id (for a single type)
+
+This is the key theorem showing that packing then unpacking a value recovers it.
+Corresponds to Coq's `value_of_bits_of_value`. -/
+theorem unpackValue_packValue : ∀ (tau : Ty) (v : tau.denote),
+    unpackValue tau (packValue tau v) = v := by
+  intro tau v
+  cases tau with
+  | bits sz => simp only [packValue, unpackValue]
+  | enum sig => simp only [packValue, unpackValue]
+  | struct name fields =>
+    -- Struct case requires induction on field list with bitvector extraction
+    -- The encoding concatenates fields MSB-first, unpacking extracts via slices
+    sorry
+  | array elemType len =>
+    -- Array case requires induction on length with bitvector extraction
+    sorry
+
+/-- Roundtrip: packValue ∘ unpackValue = id (for a single type)
+
+This is the key theorem showing that unpacking then packing bits recovers them.
+Corresponds to Coq's `bits_of_value_of_bits`. -/
+theorem packValue_unpackValue : ∀ (tau : Ty) (bs : BitVec tau.size),
+    packValue tau (unpackValue tau bs) = bs := by
+  intro tau bs
+  cases tau with
+  | bits sz => simp only [packValue, unpackValue]
+  | enum sig => simp only [packValue, unpackValue]
+  | struct name fields =>
+    -- Struct case: reconstructing a bitvector from extracted slices
+    sorry
+  | array elemType len =>
+    -- Array case: similar reconstruction
+    sorry
+
+/-- Injectivity of packValue: distinct values have distinct bit representations -/
+theorem packValue_injective {tau : Ty} {v1 v2 : tau.denote}
+    (h : packValue tau v1 = packValue tau v2) : v1 = v2 := by
+  have h1 := unpackValue_packValue tau v1
+  have h2 := unpackValue_packValue tau v2
+  rw [h] at h1
+  rw [← h1, h2]
+
+/-- Injectivity of unpackValue: distinct bits have distinct values -/
+theorem unpackValue_injective {tau : Ty} {bs1 bs2 : BitVec tau.size}
+    (h : unpackValue tau bs1 = unpackValue tau bs2) : bs1 = bs2 := by
+  have h1 := packValue_unpackValue tau bs1
+  have h2 := packValue_unpackValue tau bs2
+  rw [h] at h1
+  rw [← h1, h2]
+
+end PackUnpack
+
 end Koika
