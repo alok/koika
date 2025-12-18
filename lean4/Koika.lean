@@ -26,6 +26,9 @@ import Koika.Compile.CircuitProperties
 import Koika.Compile.Lower
 import Koika.Compile.Optimize
 import Koika.Compile.Compiler
+import Koika.Compile.Correctness.LoweringCorrectness
+import Koika.Compile.Correctness.CircuitCorrectness
+import Koika.Compile.Correctness.Correctness
 import Koika.Backend.Verilog
 import Koika.Interop
 import Koika.Basic
